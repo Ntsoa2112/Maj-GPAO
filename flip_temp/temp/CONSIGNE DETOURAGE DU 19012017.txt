@@ -1,0 +1,3 @@
+8.84 détourage avec script + repère et fond blanc
+
+7.84 sequence 800 (1100 x 1200) 72 dpi + fond blanc, sans repère.

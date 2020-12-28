@@ -1,0 +1,6 @@
+
+
+- Détourage
+- Refaire l'ombre sur un calque séparé
+- Supprimer les marques
+- Passer ce qui est en orange en jaune Kiloutou

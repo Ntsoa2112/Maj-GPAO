@@ -1,0 +1,67 @@
+#ldtCorp .value,.value td {
+  border: 1px solid grey;
+  border-collapse: collapse;
+  padding: 5px;
+}
+#ldtCorp .value th{
+  border: 1px solid grey;
+  border-collapse: collapse;
+  padding: 5px;
+}
+#ldtCorp table tr:nth-child(odd) {
+  background-color: #f1f1f1;
+}
+#ldtCorp table tr:nth-child(even) {
+  background-color: #ffffff;
+}
+
+#ldtCorp .table{
+    margin-left: 30%;
+}
+.vide{	
+	background-color:#FFCCFF;
+	border:#FF0000 solid 3px;
+}
+#commentaire{
+	width: 95%;
+}
+#insertionOuModification {
+  text-align: center;
+}
+.success{
+  background-color: #92C74B;
+  font-family: Impact, "Arial Black", Arial, Verdana, sans-serif;
+  font-size: large;
+  width: 70%;
+}
+.fail{
+  background-color: #F1682A;
+  font-family: Impact, "Arial Black", Arial, Verdana, sans-serif;
+  font-size: large;
+  width: 70%;
+}
+#acceuil{
+  background-color: #FFFFFF;
+}
+#redirection{
+  color: #FFFFFF;
+  background-color: #28538A;
+  width: 90%;
+}
+.lien{
+  color : #FFFFFF;
+  background-color: #89B1CA;
+  width: 60%;
+  height: 50px;
+  padding-top: 15px;
+
+}
+.lien a{
+  text-decoration: none;
+  text-align: center;
+  color: #28538A;
+  font-family: Impact, "Arial Black", Arial, Verdana, sans-serif;
+  font-size: large;
+  margin-top: 15px;
+}
+}

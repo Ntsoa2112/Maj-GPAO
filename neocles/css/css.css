@@ -1,0 +1,41 @@
+body {background:gray;text-align: center;font:10px tahoma, Arial, Helvetica, sans-serif;margin:0px;}
+.table {background:#c9e9e5;font:10px tahoma, Arial, Helvetica, sans-serif;border:0px;}
+.plan_site td{font:10px tahoma, Arial, Helvetica, sans-serif;border:0px;}
+.allee{width:20px;height:30px;background:white;min-width:15px;}
+
+.red_case {background-color:#26acde;width:100%;height:100%;text-align:center;border:1px solid gray;min-height:100px;}
+.blue_case {background-color:#27f96e;width:100%;height:100%;text-align:center;border:1px solid gray;min-height:100px;}
+.occuped{text-align: center;font:10px tahoma, Arial, Helvetica, sans-serif;padding-bottom:0px;}
+.occuped:hover {background-color:#e7e7ff;width:100%;height:100%;}
+.etat{width:8px;height:8px;padding-bottom:0px; border:1px solid gray;}
+.normal{background-color:#36eca2}
+.anomalie{background-color:#3bfbff;}
+.deconnected{background-color:red;opacity: .2;}
+.wrapup{background-color:red;}
+span{padding-left:15px;}
+.titre{font:20px tahoma, Arial, Helvetica, sans-serif;color:white;;opacity: .8;}
+.wall_{height:30px;background:black;min-width:30px;}
+
+.empty{width:300px;height:30px; background:white;font:10px tahoma, Arial, Helvetica, sans-serif;}
+#afficheur{opacity: .4;text-align:center;width:20%;height:100%;float:left;background-color:#335d84;margin-top:-25px;position:fixed;font:36px tahoma, Arial, Helvetica, sans-serif;font-weight:bold;color:#e7e7ff;padding:10px;display:none;}
+#afficheur td{font:16px tahoma, Arial, Helvetica, sans-serif;color:gray;padding:5px;border:0px;}
+#legende {width:3%;height:0%;top:80%;background-color:#335d84;position:fixed;}
+#legende div{border-top-right-radius: 0.5em;border-bottom-right-radius: 0.5em; border:1px solid white;}
+
+table{border:0px;}
+td,tr{
+ margin:0;
+ padding:0;
+ min-width:100px;
+}
+.titrei{float:left; color:#d5d5d5; font:36px tahoma, Arial, Helvetica, sans-serif;position:fixed;opacity: .5;}
+.autre{background-color:#8acfe2;}
+.mintd{min-width:100px;max-width:100px;overflow:hidden;width:100px;display: inline-block;}
+.carre{min-width:40px;min-height:40px;}
+input{display:none;}
+.s1{background-color:#4eb7d4; border:1px solid gray;}
+.s0,.s2,.s3,.s4,.s5,.s6,.s7{background-color:yellow; border:1px solid gray;}
+a{text-decoration:none;padding-bottom:15px;color:white;}
+table{
+  border-collapse: collapse;
+}

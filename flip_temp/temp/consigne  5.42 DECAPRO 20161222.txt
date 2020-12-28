@@ -1,0 +1,2 @@
+Réaliser simplement le détourage et enregistrer avec le masque,
+ laisser l'extension en .jpg (RVB ou CMJN)

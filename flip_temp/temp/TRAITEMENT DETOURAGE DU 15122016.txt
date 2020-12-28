@@ -1,0 +1,10 @@
+TRAITEMENT DU DETOURAGE DU JOUR 15122016
+
+7.84 Tsotra
+6.84 Séquence 800 (recadrage 1100 x 1200) 72 dpi, fond blanc
+
+8.83 Traitement comme d'habitude avec fond blanc
+7.83  Séquence 800 (recadrage 1100 x 1200) 72 dpi, fond blanc
+
+
+6.83 Détourage seulement. Sans recadrage, sans fond blanc.

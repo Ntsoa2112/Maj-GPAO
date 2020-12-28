@@ -1,0 +1,2502 @@
+<?php
+// AUT Mirah RATAHIRY
+// DES Requete et fonctions dossiers
+// DAT 2012 03 06
+// MAJ 2012 10 02 Ajout filtre au niveau du ldt (tri header)
+
+/*
+
+*/
+
+class Cnx extends PDO
+{
+		public $cnx;
+		//const DEFAULT_DNS = 'pgsql:host=10.128.1.2 port=5432;dbname=Neocles';
+		 const DEFAULT_DNS = 'pgsql:dbname=Neocles';
+		const DEFAULT_SQL_USER = 'postgres';
+		// const DEFAULT_SQL_PASS = 'Ra123456$';
+		const DEFAULT_SQL_PASS = 'postgres';	
+
+	function Cnx()
+	{
+		date_default_timezone_set('Africa/Nairobi');
+
+	//$this->cnx = null;
+	  $this->cnx = new PDO	(
+									self::DEFAULT_DNS,
+									self::DEFAULT_SQL_USER,
+									self::DEFAULT_SQL_PASS
+								);
+
+		return ;
+	}
+	
+	function nombreHeureOP($intervalle, $matricule)
+	{
+		$tk = explode(",", $intervalle);
+		$filtreIntervaleTemps = " AND p_ldt.date_deb_ldt = '".$intervalle."'";					
+		if (count($tk) > 1) $filtreIntervaleTemps = " AND p_ldt.date_deb_ldt >=  '".$tk[0]."' AND p_ldt.date_deb_ldt <= '".$tk[1]."'";
+		$sql = "SELECT date_deb_ldt, h_deb, h_fin FROM p_ldt WHERE id_pers = ".$matricule.$filtreIntervaleTemps ." order by p_ldt.date_deb_ldt, p_ldt.h_deb";		
+		
+		$diff;
+		$somme="0:0:0";
+		$rs=$this->cnx->query($sql);
+		
+		foreach($rs as $row)
+		{
+			if ($row['h_deb'] == "" || $row['h_fin'] == "") continue;
+			$diff = $this->hDiff($row['h_deb'], $row['h_fin'], "");
+			$somme = $this->hDiff($somme, $diff, "+");
+		}		
+		return $somme;
+	}
+	function suiviHeureOP($intervalle)
+	{
+		// selection OP
+		// somme heure op pendant la periode
+		// ajout dossier si possible
+		
+		set_time_limit(30000);
+		$tk = explode(",", $intervalle);		
+		$filtreIntervaleTemps = " where p_ldt.date_deb_ldt = '".$intervalle."'";		
+		if (count($tk) > 1) $filtreIntervaleTemps = " where p_ldt.date_deb_ldt >=  '".$tk[0]."' AND p_ldt.date_deb_ldt <= '".$tk[1]."'";
+
+		$sqlDoss = "SELECT id_pers FROM r_personnel order by id_pers";		
+		
+		$ii = 0; 
+		$str = "<table >";
+		$rsDoss=$this->cnx->query($sqlDoss);
+		
+		while($arr = $rsDoss->fetch())
+		{		
+			if ($ii >= 3) $ii = 0;
+			$cl = 'classe'.$ii;
+			$ii++;
+			
+			$str .= "<tr class = $cl>";
+			$str .= "<td>".$intervalle."</td>";
+			$str .= "<td>".$arr['id_pers']."</td>";
+			$str .= "<td>".$this->nombreHeureOP($intervalle, $arr['id_pers'])."</td>";
+			$str .= "</tr>";			
+		}
+		
+		$str .= "</table>";
+		
+		return $str;		
+	}
+	
+	// DEBUT	Gestion lot et ligne de temps
+	
+	function nextLotDispo($doss, $oper)
+	{
+		/* chargement lot en cours pour l'utilisateur courant
+			si pas de lot en cours
+			Chargement lot dispo			
+		*/
+		$rez = $this->lotEnCours($_SESSION['id']);
+		if ($rez == "")
+		{
+			$sql = "SELECT p_lot.id_lot, p_lot.libelle FROM p_lot 
+			LEFT JOIN p_lot_client ON p_lot.id_lotclient=p_lot_client.id_lotclient
+			WHERE p_lot_client.id_dossier=$doss AND p_lot.id_etape=$oper AND p_lot.id_etat=0 order by priority ASC";
+			
+			//return $sql;
+			$rs=$this->cnx->query($sql);
+			$str='';
+			while($arr = $rs->fetch())
+			{
+				$idLot =$arr['id_lot'];
+				$libLot=$arr['libelle'];
+				$str .= "<option value='$idLot'>$libLot</option>";
+				$this->updateLot($idLot, '1', "");
+				return $str;
+			}
+			return $str;
+		}
+		return $rez;
+	}
+	
+	function getLDW($doss, $oper)
+		{
+			//return $this->nextLotDispo($doss, $oper);
+			$rez = $this->lotEnCours($_SESSION['id']);
+			if ($rez != "") return $rez;
+			$sql = "SELECT p_lot.id_lot, p_lot.libelle FROM p_lot 
+			LEFT JOIN p_lot_client ON p_lot.id_lotclient=p_lot_client.id_lotclient
+			WHERE p_lot_client.id_lotclient=$doss AND p_lot.id_etape=$oper AND p_lot.id_etat=0 order by priority ASC";
+			
+			//return $sql;
+			$rs=$this->cnx->query($sql);
+			$str='<option value="_"> </option>';
+			while($arr = $rs->fetch())
+			{
+				$str .= '<option value="'.$arr['id_lot'].'">'.$arr['libelle'].'</option>';
+			}
+			return $str;
+		}
+		
+	function lotEnCours($idPers)
+	{
+		$sql = "SELECT p_lot.id_lot, p_lot.libelle FROM p_lot WHERE id_pers = $idPers AND id_etat = 1";
+				
+		//return $sql;
+		$rs=$this->cnx->query($sql);
+		$str="";
+		while($arr = $rs->fetch())
+		{
+			$str .= '<option value="'.$arr['id_lot'].'">'.$arr['libelle'].'</option>';
+			return $str;
+		}
+		return $str;
+	}
+	
+	// FIN Gestion lot
+	
+	
+	function insertConsigne($doss, $etap, $url)
+	{
+		$url = substr($url, 2, strlen($url));
+		$sql = "INSERT INTO p_consigne (id_dossier, id_etape, url) values ($doss, $etap, '$url')";
+		//return $sql;
+		if ($this->cnx->exec($sql))
+		{
+			 return $this->getLstConsigne($doss, $etap);
+		}
+	}
+	
+	function getLstConsigne($idDossier, $idEtape)
+	{
+		$sql = "SELECT id, url from p_consigne where id_dossier = $idDossier";
+		
+		if ($idEtape != "")  $sql .=" AND id_etape = $idEtape";
+		
+		$sql .= ' order by id DESC';
+		
+		$rs=$this->cnx->query($sql);
+		
+		$str = "<table>";
+		
+		foreach($rs as $row)
+		{
+			if($_SESSION['id_droit']== 1) return $row['url'];
+			
+			$tk = explode("/", $row['url']);
+			$str .= "<tr><td><a href='".$row['url']."' class='consigne'>".$tk[count($tk) - 1]."</a><hr/></td>";
+			if ($_SESSION['id_droit'] != 1)
+				$str .= "<td OnClick=deleteConsigne('".$row['id']."') class='delete'></td>";
+			$str .= "</tr>";
+
+		}
+		$str .= "</table>";
+		
+		if($_SESSION['id_droit']== 1) return "aucun.htm";
+		return $str;	
+	}
+	
+	function getInfo($idPers)
+	{
+		$currDate = date("Ymd");
+		$sql = "SELECT p_ldt.id_ldt, p_ldt.id_dossier, p_ldt.date_deb_ldt,p_ldt.date_fin_ldt, r_personnel.appelation, r_personnel.matricule, p_dossier.num_dossier,p_etape.libelle as lib, p_ldt.commentaire, p_type_ldt.libelle as type, p_ldt.h_deb, p_ldt.h_fin, p_ldt.quantite, p_ldt.address_ip, p_ldt.nbre_erreur, p_etat.libelle as statu FROM p_ldt 
+			LEFT JOIN p_dossier ON p_ldt.id_dossier=p_dossier.id_dossier 
+			LEFT JOIN p_lot_client ON p_ldt.id_lotclient=p_lot_client.id_lotclient  
+			LEFT JOIN p_lien_oper_dossier ON p_ldt.id_etape=p_lien_oper_dossier.id_lien 
+			LEFT JOIN p_etape ON p_lien_oper_dossier.id_oper=p_etape.id_etape
+			LEFT JOIN p_etat ON p_ldt.id_etat=p_etat.id_etat
+			LEFT JOIN p_type_ldt on p_type_ldt.id_type_ldt = p_ldt.id_type_ldt
+			LEFT JOIN r_personnel ON r_personnel.id_pers=p_ldt.id_pers WHERE  p_ldt.id_pers = $idPers And date_deb_ldt = '$currDate' order by h_deb desc";
+		//return $sql;
+		$rs=$this->cnx->query($sql);
+		$str = "<table><tr><td></td><td>$idPers</td></tr>";
+		foreach($rs as $row)
+		{
+			$str .= "<tr><td></td><td>".$row['num_dossier']."</td></tr>";
+			$str .= "<tr><td></td><td>".$row['h_deb']."</td></tr>";
+			$str .= "<tr><td></td><td>".$row['h_fin']."</td></tr>";
+			
+			$str .= "<tr><td></td><td>".$row['lib']."</td></tr>";
+			$str .= "<tr><td></td><td><span class='duration'>Il y a: ".$this->hDiff($row['h_deb'], date("H:m:s"), "")."</span></td></tr>";
+			$str .= "<tr><td></td><td>".$row['address_ip']."</td></tr></table>";
+			
+
+			return "$str";
+		}
+		return $str."</table>";
+	}
+	function getInfo_save($idPers)
+	{
+		$currDate = date("Ymd");
+		$sql = "SELECT p_ldt.id_ldt, p_ldt.id_dossier, p_ldt.date_deb_ldt,p_ldt.date_fin_ldt, r_personnel.appelation, r_personnel.matricule, p_dossier.num_dossier,p_etape.libelle as lib, p_ldt.commentaire, p_type_ldt.libelle as type, p_ldt.h_deb, p_ldt.h_fin, p_ldt.quantite, p_ldt.address_ip, p_ldt.nbre_erreur, p_etat.libelle as statu FROM p_ldt 
+			LEFT JOIN p_dossier ON p_ldt.id_dossier=p_dossier.id_dossier 
+			LEFT JOIN p_lot_client ON p_ldt.id_lotclient=p_lot_client.id_lotclient  
+			LEFT JOIN p_lien_oper_dossier ON p_ldt.id_etape=p_lien_oper_dossier.id_lien 
+			LEFT JOIN p_etape ON p_lien_oper_dossier.id_oper=p_etape.id_etape
+			LEFT JOIN p_etat ON p_ldt.id_etat=p_etat.id_etat
+			LEFT JOIN p_type_ldt on p_type_ldt.id_type_ldt = p_ldt.id_type_ldt
+			LEFT JOIN r_personnel ON r_personnel.id_pers=p_ldt.id_pers WHERE  p_ldt.id_pers = $idPers And date_deb_ldt = '$currDate' order by h_deb desc";
+		//return $sql;
+		$rs=$this->cnx->query($sql);
+		$str = "<table><tr><td></td><td>$idPers</td></tr>";
+		foreach($rs as $row)
+		{
+			
+			$str .= "<tr><td></td><td>".$row['h_deb']."</td></tr>";
+			$str .= "<tr><td></td><td>".$row['h_fin']."</td></tr>";
+			$str .= "<tr><td></td><td><h2>".$row['num_dossier']."</h2></td></tr>";
+			$str .= "<tr><td></td><td>".$row['lib']."</td></tr>";
+			$str .= "<tr><td></td><td>".$row['address_ip']."</td></tr></table>";
+			return "$str";
+		}
+		return $str."</table>";
+	}
+	function getLstMat()
+	{
+		$sql = "select id_pers, matricule from r_personnel order by id_pers";
+		$rs=$this->cnx->query($sql);
+		$str="";
+		while($arr = $rs->fetch())
+		{
+			$str .= '<option value="'.$arr['id_pers'].'">'.$arr['matricule'].'</option>';
+		}
+		
+		return $str;
+	}
+	
+	function getListConnected($batiment)
+	{
+		$currDate = date("Y/m/d");
+		//return $currDate;
+		$batiment='IN';
+		
+		$sql = "SELECT distinct(id_util) from r_pointage where pdate='".$currDate."'";
+		
+		/*
+		FILTRE POUR
+		*/
+		
+		$rs=$this->cnx->query($sql);
+		$str = "<table>";
+		$i=0;
+		$rows = "<tr>";
+		foreach($rs as $row)
+		{
+			if ($row['id_util'] == '0') continue;
+			if ($i<10)
+			{
+				$etat = $this->getEtat($row['id_util']);
+				switch($etat)
+				{
+					case "-1":
+						$rows .= "<td class='poste gray'><center class='gray'>".$row['id_util']." <br/>- <br/>non connect&eacute;</center></td>";
+						break;
+					case "0":
+						$rows .= "<td class='poste notConnected'>".$this->getInfo($row['id_util'])."</td>";
+						break;
+					case "1":
+						$rows .= "<td class='poste plus1'>".$this->getInfo($row['id_util'])."</td>";
+						break;
+					case "2":
+						$rows .= "<td class='poste plus2'>".$this->getInfo($row['id_util'])."</td>";
+						break;
+					case "3":
+						$rows .= "<td class='poste'>".$this->getInfo($row['id_util'])."</td>";
+						break;
+					default:
+						$rows .= "<td class='poste notConnected'>".$this->getInfo($row['id_util'])."</td>";
+				}
+				$i++;
+				
+			}
+			else
+			{
+				$str .= $rows."</tr>";
+				$rows = "<tr>";
+				$i=0;
+			}
+		}
+		$str .= "<tr>".$rows."</tr>";
+		$str .= "</table>";
+		return $str;
+	}
+	function getEtat($idPers)
+	{
+		$currDate = date("Ymd");
+		$sql = "SELECT h_deb as deb, h_fin from p_ldt where id_pers = $idPers And date_deb_ldt = '$currDate' order by h_deb desc";
+		//return $sql;
+		$rs=$this->cnx->query($sql);
+		foreach($rs as $row)
+		{
+			
+			$currTime = date("H:m:s"); 
+			//return 1;
+			$currTime = $this->hDiff($currTime, '00:05:00', "+");
+			//echo $currTime." - ".$row['deb'].'\n';
+			//return '1';
+			$diff = $this->hDiff($row['deb'], $currTime, "");
+			
+			$tokens =  explode(":", $diff);
+			
+			$h = $tokens[0];
+			$m = $tokens[1];
+			
+			
+			//echo $h." - ".$m.'\n';
+			if ($row['h_fin'] == "")
+			{
+				if ($h > 1)return '2';
+				if ($h > 0)return '1';
+				if ($h == 0)return '3';
+				return 0;
+			}
+			else return '0';
+		}
+		return	-1;	
+	}
+	function getEtat_save($idPers, $laps)
+	{
+		$currDate = date("Ymd");
+		$sql = "SELECT h_deb as deb, h_fin, id_etat from p_ldt where id_pers = $idPers And date_deb_ldt = '$currDate' order by h_deb desc";
+		//return $sql;
+		$rs=$this->cnx->query($sql);
+		foreach($rs as $row)
+		{
+		
+			$currTime = date("H:m:s"); 
+			//return 1;
+			$currTime = $this->hDiff($currTime, '00:39:00', "+");
+			//echo $currTime." - ".$row['deb'].'\n';
+			//return '1';
+			$diff = $this->hDiff($row['deb'], $currTime, "");
+			
+			$tokens =  explode(":", $diff);
+			
+			$h = $tokens[0];
+			$m = $tokens[1];
+			
+			//echo $h." - ".$m.'\n';
+			if ($row['h_fin'] == "")
+			{
+				switch($h)
+				{
+					case $h > 2:
+						return '2';
+					break;
+					case $h > 1:
+						return '1';
+					break;
+					default:
+						if ($h < 1 && $m > 30) return '30';
+						return '10';
+					break;
+				}
+			}
+			else return '0';
+		}		
+	}
+	
+    function hDiff($t1, $t2, $oper)
+	{
+		// difference heure hh:mm:ss
+		$h = explode(":", $t1);
+		$m = explode(":", $t2);
+		
+		$h1 = $h[0];
+		$h2 = $m[0];
+		$m1 = $h[1];
+		$m2 = $m[1];
+		$s1 = $h[2];
+		$s2 = $m[2];
+		
+		if ($oper == "+") $ret = (($h2*3600)+($m2*60)+($s2)) + (($h1*3600)+($m1*60)+($s1));
+		else $ret = (($h2*3600)+($m2*60)+($s2)) - (($h1*3600)+($m1*60)+($s1));
+		
+		$h=floor($ret/3600);
+		$m=floor(($ret-($h*3600))/60);
+		$s=($ret-($h*3600))-$m*60;
+		
+		return $h.':'.$m .':'.$s;
+	}	
+	function deleteLdt($p_id_ldt)
+	{
+		$rs=$this->cnx->exec("delete from p_ldt where id_ldt=$p_id_ldt");
+	}
+	function deleteLot($idLot)
+	{
+		$rs=$this->cnx->exec("delete from p_lot where id_lot=$idLot");
+	}
+	function delConsigne($p_id_ldt)
+	{
+		$sql = "SELECT url from p_consigne where id = $p_id_ldt";
+		$rs=$this->cnx->query($sql);
+		$url = "";
+		
+		foreach($rs as $row)
+		{
+			$url = $row['url'];
+		}
+		$sql = "delete from p_consigne where id=$p_id_ldt";
+		$rs=$this->cnx->exec($sql);
+		
+		$filename = $_SERVER['DOCUMENT_ROOT']."$/".$url;
+		//return $filename;
+		unlink($filename);
+	}
+	function updateLot($lstId, $etat, $prio, $mat)
+	{
+		$filtre = "";
+		$sql = "update p_lot set id_pers =".$_SESSION['id'];
+		if ($mat != "") $sql = "update p_lot set id_pers =$mat";
+		if ($etat != "") $filtre .= ", id_etat = $etat";
+		if ($prio != "") $filtre .= ", priority = $prio";
+
+		$sql .= $filtre." where id_lot IN ($lstId)";
+		//return " id_etat = $etat"." priority = $prio";
+		$rs=$this->cnx->exec($sql);
+	}
+	function updateLdt($deb, $fin, $qt, $err, $stat, $id, $dDeb, $dFin, $com)
+	{
+		$sql = "UPDATE p_ldt SET h_deb='".$deb."'";
+
+		$sql .= ", h_fin='".$fin."'";
+		$sql .= ", quantite='".$qt."'";
+		$sql .= ", nbre_erreur='".$err."'";
+		$sql .= ", date_deb_ldt='".$dDeb."'";
+		$sql .= ", date_fin_ldt='".$dFin."'";
+		$sql .= ", machine='".$com."'";
+		if ($stat != "") $sql .= ", id_etat=".$stat;
+		$sql .= " WHERE id_ldt=".$id;
+		//return $sql;
+		$rs=$this->cnx->exec($sql);
+	}
+	function getOneLdt($id)
+	{
+		$sql = "SELECT p_ldt.id_ldt, p_ldt.id_dossier, p_ldt.date_deb_ldt,p_ldt.date_fin_ldt, r_personnel.appelation, r_personnel.matricule, p_dossier.num_dossier,p_etape.libelle as lib, p_ldt.commentaire, p_type_ldt.libelle as type, p_ldt.h_deb, p_ldt.h_fin, p_ldt.quantite, p_ldt.nbre_erreur, p_etat.libelle as statu, p_ldt.machine FROM p_ldt 
+			LEFT JOIN p_dossier ON p_ldt.id_dossier=p_dossier.id_dossier 
+			LEFT JOIN p_lot_client ON p_ldt.id_lotclient=p_lot_client.id_lotclient  
+			LEFT JOIN p_lien_oper_dossier ON p_ldt.id_etape=p_lien_oper_dossier.id_lien 
+			LEFT JOIN p_etape ON p_lien_oper_dossier.id_oper=p_etape.id_etape
+			LEFT JOIN p_etat ON p_ldt.id_etat=p_etat.id_etat
+			LEFT JOIN p_type_ldt on p_type_ldt.id_type_ldt = p_ldt.id_type_ldt
+			LEFT JOIN r_personnel ON r_personnel.id_pers=p_ldt.id_pers WHERE p_ldt.id_ldt= ".$id;
+		
+		$rs=$this->cnx->query($sql);
+		foreach($rs as $row)
+		{
+			$str = $row['num_dossier']."|".$row['lib']."|".$row['h_deb']."|".$row['h_fin']."|".$row['quantite']."|".$row['nbre_erreur']."|".$row['statu']."|".$row['matricule']."|".$row['id_dossier']."|".$row['date_deb_ldt']."|".$row['date_fin_ldt']."|".$row['machine'];
+			return $str;
+		}
+		return "";
+	}
+	
+	function getLdt($dossier, $lstPeriode, $matricule, $statut, $orderby)
+	{
+		$filtre = "";		
+		if ($lstPeriode != "")
+		{
+			$filtre = " AND p_ldt.date_deb_ldt = '".$lstPeriode."'";
+			
+			$tk = explode(",", $lstPeriode);
+			if (count($tk) > 1)
+			{
+				$lstPeriode= str_replace($lstPeriode, ",", "_");
+				$filtre = " AND p_ldt.date_deb_ldt >=  '".$tk[0]."' AND p_ldt.date_deb_ldt <= '".$tk[1]."'";
+			}		
+		}
+		$folder = '../CSV/'.$_SESSION['id'];
+		$this->clearDir($folder );
+		if (!is_dir($folder)) mkdir($folder, 0755, true);
+		$fName = $folder.'/LDT_'.$_SESSION['id'].'_'.$lstPeriode.'.csv';
+		$fw = fopen($fName, 'w');	
+				
+		if ($dossier != "") 	$filtre .= " AND p_ldt.id_dossier = $dossier";
+		if ($matricule != "") 	$filtre .= " AND p_ldt.id_pers = $matricule";
+		if ($statut != "") 		$filtre .= " AND p_ldt.id_etat = $statut";		
+
+		$sql = "SELECT p_ldt.id_ldt, p_ldt.id_lot, p_ldt.machine, p_ldt.date_deb_ldt,p_ldt.date_fin_ldt, r_personnel.appelation, r_personnel.matricule, p_dossier.num_dossier,p_etape.libelle as lib, p_ldt.commentaire, p_ldt.duration, p_type_ldt.libelle as type, p_ldt.h_deb, p_ldt.h_fin, p_ldt.quantite, p_ldt.nbre_erreur, p_etat.libelle as statu, p_lot.libelle as liblot, p_lot_client.libelle as liblotclient FROM p_ldt 
+			LEFT JOIN p_dossier ON p_ldt.id_dossier=p_dossier.id_dossier 
+			LEFT JOIN p_lot ON p_ldt.id_lot=p_lot.id_lot 
+			LEFT JOIN p_lot_client ON p_ldt.id_lotclient=p_lot_client.id_lotclient  
+			LEFT JOIN p_lien_oper_dossier ON p_ldt.id_etape=p_lien_oper_dossier.id_lien 
+			LEFT JOIN p_etape ON p_lien_oper_dossier.id_oper=p_etape.id_etape
+			LEFT JOIN p_etat ON p_ldt.id_etat=p_etat.id_etat
+			LEFT JOIN p_type_ldt on p_type_ldt.id_type_ldt = p_ldt.id_type_ldt
+			LEFT JOIN r_personnel ON r_personnel.id_pers=p_ldt.id_pers WHERE 1=1 ";
+		$sql .= $filtre;
+		
+		if ($orderby == "") $orderby = 'p_ldt.h_deb';
+		$sql .= " ORDER BY ".$orderby;
+		
+		$str = "<table width=\"100%\"><thead><tr>
+		<th class='th'  id='date_deb_ldt'>Date debut</th>
+		<th class='th'  id='date_fin_ldt'>Date fin</th>
+		<th class='th'  id='appelation'>Appelation</th>
+		<th class='th'  id='matricule'>User</th>
+		<th class='th'  id='num_dossier'>Dossier</th>
+		<th class='th'  id='lib'>Etape</th>
+		<th class='th'  id='commentaire'>Lot</th>
+		<th class='th'  id='machine'>Comment</th>
+		<th class='th'  id='type'>Type</th>
+		<th class='th'  id='h_deb'>Heure Debut</th>
+		<th class='th'  id='h_fin'>Heure Fin</th>
+		<th class='th'  id='h_fin'>Duree</th>
+		<th class='th'  id='quantite'>Qte</th>
+		<th class='th'  id='nbre_erreur'>NbErr</th>
+		<th class='th'  id='statu'>Statut</th>
+		<th></th></tr></thead>";
+		$ii = 0; 
+		
+		$row = "Date debut\tDate fin\tAppelation\tMatricule\tDossier\tEtape\tLot\tComment\tType\tHeure Debut\tHeure Fin\tDuree\tQuantite\tNombre Erreur\tStatut\n";
+		fwrite($fw, $row);
+		
+      
+		$rs=$this->cnx->query($sql);
+		//return $sql;
+		$i=0;
+		foreach($rs as $row)
+		{
+			$diff="";
+			if ($row['date_fin_ldt'] != "")
+			$diff = $this->hDiff($row['h_deb'], $row['h_fin'], "");
+			
+			if ($ii == 3) $ii = 0;			
+
+				$cl = 'classe'.$ii;
+				$ii++;
+				$str .= "<tr class = $cl id='".$row['id_ldt']."' >";
+				$str .= "<td><div class=\"ldt_date\">".$row['date_deb_ldt']."</div></td>";
+				$str .= "<td><div class=\"ldt_date\">".$row['date_fin_ldt']."</div></td>";
+				$str .= "<td>".$row['appelation']."</td>";
+				$str .= "<td><div class=\"ldt_mat\">".$row['matricule']."</div></td>";		
+				
+				$str .= "<td>".$row['num_dossier']."</td>";
+				
+				$str .= "<td>".$row['lib']."</td>";
+				if ($row['id_lot'] != 0)
+				{
+					$str .= "<td><div class=\"ldtlib\">".$row['liblot']."</div></td>";
+					$str .= "<td>".$row['commentaire']."</td>";
+				}
+				else 
+				{
+					$str .= "<td><div class=\"ldtlib\">".$row['commentaire']."</div></td>";
+					$str .= "<td>".$row['machine']."</td>";
+				}
+				
+				$str .= "<td>".$row['type']."</td>";
+				$str .= "<td><div class=\"ldt_date\">".$row['h_deb']."</div></td>";
+				$str .= "<td><div class=\"ldt_date\">".$row['h_fin']."</div></td>";
+				$str .= "<td><div class=\"ldt_date\">".$diff."</div></td>";
+				$str .= "<td><div class=\"ldt_nb\">".$row['quantite']."</div></td>";
+				$str .= "<td><div class=\"ldt_nb\">".$row['nbre_erreur']."</div></td>";
+				$str .= "<td>".$row['statu']."</td>";
+				$str .= "<td OnClick=updateLdtForm('".$row['id_ldt']."') class='edit'></td>";
+				if ($_SESSION['id_droit'] != 1)
+				$str .= "<td OnClick=deleteLdt('".$row['id_ldt']."') class='delete'></td>";
+				$str .= "</tr>";
+				$i++;
+				
+								
+				$rw = $row['date_deb_ldt']."\t";
+				$rw .= $row['date_fin_ldt']."\t";
+				$rw .= $row['appelation']."\t";
+				$rw .= $row['matricule']."\t";			
+				$rw .=$row['num_dossier']."\t";
+				
+				$rw .= $row['lib']."\t";
+				if ($rw['id_lot'] != 0)
+				{
+					$rw .= $row['liblot']."\t";
+					$rw .= $row['commentaire']."\t";
+				}
+				else 
+				{
+					$rw .= $row['commentaire']."\t";
+					$rw .= $row['machine']."\t";
+				}
+				
+				$rw .= $row['type']."\t";
+				$rw .= $row['h_deb']."\t";
+				$rw .= $row['h_fin']."\t";
+				$rw .= $diff."\t";
+				$rw .= $row['quantite']."\t";
+				$rw .= $row['nbre_erreur']."\t";
+				$rw .= $row['statu']."\n";
+			
+				fwrite($fw, $rw);
+		}
+		fclose($fw);
+		$nbLigne = "</table><table><tr><td><h4>Total Found: $i</h4></td><td><a href='./CSV/$fName' OnClick=deleteReport('".$matricule."')><input type='submit' value='' class='copy' title='Exporter au format CSV'/></a></td></tr></table>";
+		return $nbLigne.$str;		
+	}
+	
+	
+	function deleteReport($idPers)
+	{
+		foreach (@glob($path.$Patern) as $filename) 
+		{
+				@unlink($filename);
+		}
+	}
+	
+	
+	function clearDir($dossier) 
+	{
+		$ouverture=@opendir($dossier);
+		if (!$ouverture) return;
+		while($fichier=readdir($ouverture)) {
+			if ($fichier == '.' || $fichier == '..') continue;
+			if (is_dir($dossier."/".$fichier)) 
+			{
+				$r=$this->clearDir($dossier."/".$fichier);
+				if (!$r) return false;
+			}
+			else 
+			{
+				$r=@unlink($dossier."/".$fichier);
+				if (!$r) return false;
+			}
+		}
+		closedir($ouverture);
+		$r=@rmdir($dossier);
+		if (!$r) return false;
+		return true;
+	}
+	
+	function getLot($dossier, $lotClient, $matricule, $statut, $etape, $prio, $name, $ordre)
+	{	
+		//	
+		$filtre = "";
+		if ($dossier != "")
+		{
+			 if ($dossier == '39') $filtre .= " AND p_dossier.id_dossier IN (108,109,110,111,112,113,107,39)";
+			 else $filtre .= " AND p_dossier.id_dossier = $dossier";
+		}
+		if ($lotClient != "") 	$filtre .= " AND p_lot.id_lotclient = $lotClient";
+		if ($matricule != "") 	$filtre .= " AND p_lot.id_pers = $matricule";
+		if ($statut != "") 		$filtre .= " AND p_lot.id_etat = $statut";	
+		if ($etape != "") 		$filtre .= " AND p_lot.id_etape = $etape";
+		if ($prio != "") 		$filtre .= " AND p_lot.priority = $prio";
+		if ($name != "") 		$filtre .= " AND p_lot.libelle like '%$name%'";		
+
+		$sql = "SELECT p_dossier.num_dossier, p_lot_client.libelle as ldg, p_lot.id_lot as id,p_lot.libelle as lib, p_etat.libelle as etat, p_etape.libelle as etape ,p_lot.id_pers, p_lot.priority, p_lot.id_pers, p_lot.duree FROM p_lot
+        LEFT JOIN p_etat ON p_lot.id_etat= p_etat.id_etat 
+		LEFT JOIN p_lien_oper_dossier ON p_lot.id_etape= p_lien_oper_dossier.id_lien  
+		LEFT JOIN p_etape ON p_etape.id_etape= p_lien_oper_dossier.id_oper 
+		LEFT JOIN p_lot_client ON p_lot.id_lotclient = p_lot_client.id_lotclient
+		LEFT JOIN p_dossier ON p_lot_client.id_dossier = p_dossier.id_dossier
+		WHERE 1=1";	
+		
+		if ($ordre == "") $sql .= $filtre." order by lib";
+		else $sql .= $filtre." ORDER BY ".$ordre;
+		
+		$folder = '../CSV/'.$_SESSION['id'];
+		$this->clearDir($folder );
+		if (!is_dir($folder)) mkdir($folder, 0755, true);
+		$fName = $folder.'/LOT_'.$_SESSION['id'].'_'.$dossier.'_'.$lotClient.'_'.$etape.'.csv';
+		$fw = fopen($fName, 'w');
+		
+		$str = "<table width='100%'>
+		<thead><tr>
+		<th  class='th' width='20%' id='num_dossier' class='filter'>Dossier</th>
+		<th  class='th' id='p_lot_client.libelle' class='filter'>Lot client</th>
+		<th  class='th' id='p_lot.libelle'>Lot</th>
+		<th  class='th' id='p_etape.libelle'>Etape</th>
+		<th  class='th' id='p_etat.libelle'>Etat</th>
+		<th  class='th' id='p_etat.duree'>Duree</th>
+		<th  class='th' id='p_lot.id_pers'>Matricule</th>
+		<th  class='th' id='p_lot.priority'>Priorite</th>
+		<th id='lib'><input type='checkbox' id='selectall'  ></th>		
+		</tr></thead>";
+
+		$row = "Dossier\tLot client\tLot\tEtape\tEtat\tEtape\tDuree\tMatricule\tPriorite\n";
+		fwrite($fw, $row);		
+
+		$strCsv="";		
+		
+		//return $sql;
+		$ii = 0;  
+		$nbResult=0;		
+		$rs=$this->cnx->query($sql);
+
+		foreach($rs as $row)
+		{
+			if ($ii == 3) $ii = 0;
+				$cl = 'classe'.$ii;
+				$ii++;
+				$str .= "<tr class = $cl id='".$row['id']."' >";
+				$str .= "<td>".$row['num_dossier']."</td>";
+				$str .= "<td>".$row['ldg']."</td>";
+				$str .= "<td>".$row['lib']."</td>";
+				$str .= "<td>".$row['etape']."</td>";
+				$str .= "<td>".$row['etat']."</td>";
+				if ($row['etat'] == "TERMINE") $str .= "<td>".$this->sec2hms($row['duree'])."</td>";
+				else $str .= "<td></td>";
+				$str .= "<td>".$row['id_pers']."</td>";
+				$str .= "<td>".$row['priority']."</td>";
+				$str .= "<td><input type='checkbox'  class='case' name='options[]' id=".$row['id'].">";
+				if ($_SESSION['id_droit'] != 1)
+				$str .= "<td OnClick=deleteLot('".$row['id']."') class='delete'></td>";
+				$str .= "</tr>";
+				$nbResult++;
+
+				$sr = $row['num_dossier']."\t";
+				$sr .= $row['ldg']."\t";
+				$sr .= $row['lib']."\t";
+				$sr .= $row['etape']."\t";
+				$sr .= $row['etat']."\t";
+				if ($row['etat'] == "TERMINE") $sr .= $this->sec2hms($row['duree'])."\t";
+				else $sr .= "\t";
+				$sr .= $row['id_pers']."\t";
+				$sr .= $row['priority']."\n";
+
+				fwrite($fw, $sr);				
+		}
+		fclose($fw);
+		$str .= "</table>";
+		$nbLigne = "</table><table><tr><td><h4>Total Found: $nbResult</h4></td><td><a href='./CSV/$fName'><input type='submit' value='' class='copy' title='Exporter au format CSV'/></a></td></tr></table>";
+		
+		return $nbLigne.$str;
+	}
+	
+	function suiviParMois($mois)
+	{
+		$sql = "SELECT p_ldt.date_deb_ldt, r_personnel.appelation, r_personnel.matricule, p_dossier.num_dossier,p_etape.libelle as etapLibelle, p_ldt.h_deb, p_ldt.h_fin,r_personnel.departement, p_type_ldt.libelle  FROM p_ldt 
+				LEFT JOIN p_dossier ON p_ldt.id_dossier=p_dossier.id_dossier 
+				LEFT JOIN p_lot_client ON p_ldt.id_lotclient=p_lot_client.id_lotclient  
+				LEFT JOIN p_lien_oper_dossier ON p_ldt.id_etape=p_lien_oper_dossier.id_lien 
+				LEFT JOIN p_etape ON p_lien_oper_dossier.id_oper=p_etape.id_etape
+				LEFT JOIN p_type_ldt on p_type_ldt.id_type_ldt = p_ldt.id_type_ldt
+				LEFT JOIN r_personnel ON r_personnel.id_pers=p_ldt.id_pers 
+				where p_ldt.date_deb_ldt like '".$mois."%' order by p_ldt.date_deb_ldt, p_ldt.h_deb";
+				
+		//return $sql;
+		$rs=$this->cnx->query($sql);
+      
+		$str = "<table  class='hj'>";
+		$ii = 0; 
+		
+		$diff;
+		$somme="0:0:0";
+		$lastDate = "";
+		
+		foreach($rs as $row)
+		{
+			if ($ii >= 3) $ii = 0;
+			if ($row['h_deb'] == "" || $row['h_fin'] == "") continue;
+
+			$cl = 'classe'.$ii;
+			
+						
+			if ($lastDate != $row['date_deb_ldt']) 
+			{
+				$str .= "<tr class = $cl>";
+				$str .= "<td>".$lastDate."</td>";
+				$str .= "<td>".$somme."</td>";
+				$str .= "</tr>";
+				$somme="0:0:0";
+				$ii++;
+			}
+			
+			$lastDate = $row['date_deb_ldt'];
+			$diff = $this->hDiff($row['h_deb'], $row['h_fin'], "");
+			$somme = $this->hDiff($somme, $diff, "+");		
+		}
+		$str .= "</table>";
+		return $str;
+	}
+	
+	function suiviDossierPeriode($lstPeriode)
+	{
+		$periode = $lstPeriode;
+		$filtrePeriode = " AND p_ldt.date_deb_ldt = '".$lstPeriode."'";
+		$tk = explode(",", $lstPeriode);
+		
+		if (count($tk) > 1)
+		{
+			$filtrePeriode = " AND p_ldt.date_deb_ldt >=  '".$tk[0]."' AND p_ldt.date_deb_ldt <= '".$tk[1]."'";
+		}
+		$sqlDoss = "select id_dossier, num_dossier from p_dossier";
+
+		$rsDoss=$this->cnx->query($sqlDoss);
+		$str = "<table class='dp'>";
+		$ii = 0; 
+
+		foreach($rsDoss as $rowDoss)
+		{
+			$dossier = $rowDoss['id_dossier'];
+			//$str .= "<td>".$dossier."</td>";
+			
+			//continue;
+			
+			$sql = "SELECT date_deb_ldt, h_deb, h_fin FROM p_ldt WHERE id_dossier = ".$rowDoss['id_dossier'].$filtrePeriode ." order by p_ldt.date_deb_ldt, p_ldt.h_deb";
+			
+			//return $sqlDoss;
+			
+			$rs=$this->cnx->query($sql);
+			$diff;
+			$somme="0:0:0";
+			if ($dossier == "") continue;
+			
+			foreach($rs as $row)
+			{
+				if ($row['h_deb'] == "" || $row['h_fin'] == "") continue;
+				if (strlen($row['h_deb']) != 8 || strlen($row['h_deb']) != 8)continue;
+				$diff = $this->hDiff($row['h_deb'], $row['h_fin'], "");
+				$somme = $this->hDiff($somme, $diff, "+");
+			}
+			if ($somme=="0:0:0") continue;
+			//$rs->close();
+			if ($ii >= 3) $ii = 0;
+			$cl = 'classe'.$ii;
+			$ii++;
+			
+			$nomDossier = $rowDoss['num_dossier'];
+			if ($nomDossier == "") $nomDossier  = "Hors prod";
+			$str .= "<tr class = $cl>";
+			$str .= "<td>".$periode."</td>";
+			$str .= "<td>".$nomDossier."</td>";
+			$str .= "<td>".$somme."</td>";
+			$str .= "</tr>";
+		}
+		$str .= "</table>";
+		return $str;
+	}
+	
+	function dureeHorsProd($lstPeriode)
+	{
+		$periode = $lstPeriode;
+		$filtrePeriode = " AND p_ldt.date_deb_ldt = '".$lstPeriode."'";
+		$tk = explode(",", $lstPeriode);
+		
+		if (count($tk) > 1)
+		{
+			$filtrePeriode = " AND p_ldt.date_deb_ldt >=  '".$tk[0]."' AND p_ldt.date_deb_ldt <= '".$tk[1]."'";
+		}
+		$sqlDoss = "select id_dossier, num_dossier from p_dossier where id_etat = 0";
+
+		$rsDoss=$this->cnx->query($sqlDoss);
+		$str = "<table class='dp'>";
+		$ii = 0; 
+
+		foreach($rsDoss as $rowDoss)
+		{
+			$dossier = $rowDoss['id_dossier'];
+			$sql = "SELECT date_deb_ldt, h_deb, h_fin FROM p_ldt WHERE id_type_ldt <> 0 ".$filtrePeriode ." order by p_ldt.date_deb_ldt, p_ldt.h_deb";
+							
+			$rs=$this->cnx->query($sql);
+			$diff;
+			$somme="0:0:0";
+			if ($dossier != "") continue;
+			foreach($rs as $row)
+			{
+				if ($row['h_deb'] == "" || $row['h_fin'] == "") continue;
+				$diff = $this->hDiff($row['h_deb'], $row['h_fin'], "");
+				$somme = $this->hDiff($somme, $diff, "+");
+			}
+			//$rs->close();
+			if ($ii >= 3) $ii = 0;
+			$cl = 'classe'.$ii;
+			$ii++;
+			
+			$nomDossier = $rowDoss['num_dossier'];
+			if ($nomDossier == "") $nomDossier  = "Hors prod";
+			$str .= "<tr class = $cl>";
+			$str .= "<td>".$periode."</td>";
+			$str .= "<td>".$nomDossier."</td>";
+			$str .= "<td>".$somme."</td>";
+			$str .= "</tr>";
+		}
+		$str .= "</table>";
+		return $str;
+	}
+	
+	function getLstEtape($dossier)
+	{
+		$sql = "select id_lien, p_etape.libelle from p_lien_oper_dossier 
+				LEFT JOIN p_etape ON p_lien_oper_dossier.id_oper=p_etape.id_etape
+				WHERE id_dossier = $dossier order by id_lien";
+		$rs=$this->cnx->query($sql);
+		$str='<option value=""></option>';;
+		while($arr = $rs->fetch())
+		{
+			$str .= '<option value="'.$arr['id_lien'].'">'.$arr['libelle'].'</option>';
+		}
+		return $str;
+	}
+	
+	function suiviDossierEtape($lstPeriode, $dossier)
+	{
+		$periode = $lstPeriode;
+		$filtrePeriode = " where p_ldt.date_deb_ldt = '".$lstPeriode."'";
+		$tk = explode(",", $lstPeriode);
+		
+		if (count($tk) > 1)
+		{
+			$filtrePeriode = " where p_ldt.date_deb_ldt >=  '".$tk[0]."' AND p_ldt.date_deb_ldt <= '".$tk[1]."'";
+		}
+		$filtrePeriode .= " AND p_ldt.id_dossier = $dossier";
+		$sqlLstEtape = "select distinct(id_etape) from p_ldt ".$filtrePeriode ;
+		
+		$sqlLstEtape = "select id_lien, p_etape.libelle from p_lien_oper_dossier 
+							LEFT JOIN p_etape ON p_lien_oper_dossier.id_oper=p_etape.id_etape
+							WHERE id_dossier = $dossier order by id_lien";
+		
+		
+
+		$rsEtape=$this->cnx->query($sqlLstEtape);
+		$str = "<table class='je'>";
+		$ii = 0; 
+		
+		//return $sqlDoss;
+		foreach($rsEtape as $rowDoss)
+		{
+			$etape = $rowDoss['id_lien'];
+			$sql = "SELECT date_deb_ldt, h_deb, h_fin FROM p_ldt 
+					$filtrePeriode AND p_ldt.id_etape = $etape order by p_ldt.date_deb_ldt, p_ldt.h_deb";
+			
+			$rs=$this->cnx->query($sql);
+			$diff;
+			$somme="0:0:0";
+			
+			//echo $sql;
+			foreach($rs as $row)
+			{
+				if (count(explode(":", $row['h_deb'])) != 3 || count(explode(":", $row['h_fin'])) != 3) continue;
+				
+				$diff = $this->hDiff($row['h_deb'], $row['h_fin'], "");
+				$somme = $this->hDiff($somme, $diff,"+");
+			}
+			if ($somme == "0:0:0") continue;
+			if ($ii >= 3) $ii = 0;
+			$cl = 'classe'.$ii;
+			$ii++;
+			
+			$nomDossier = $this->getNumDossier($dossier);
+			if ($nomDossier == "") $nomDossier  = "Hors prod";
+			$str .= "<tr class = $cl>";
+			$str .= "<td>".$periode."</td>";
+			$str .= "<td>".$nomDossier."</td>";
+			$str .= "<td>".$rowDoss['libelle']."</td>";
+			$str .= "<td>".$somme."</td>";
+			$str .= "</tr>";
+		}
+		$str .= "</table>";
+		return $str;
+	}
+	
+	function suiviDossierEtape4($lstPeriode, $dossier)
+	{
+		$periode = $lstPeriode;
+		$filtrePeriode = " where p_ldt.date_deb_ldt = '".$lstPeriode."'";
+		$tk = explode(",", $lstPeriode);
+		
+		if (count($tk) > 1)
+		{
+			$filtrePeriode = " where p_ldt.date_deb_ldt >=  '".$tk[0]."' AND p_ldt.date_deb_ldt <= '".$tk[1]."'";
+		}
+		$filtrePeriode .= " AND p_ldt.id_dossier = $dossier";
+		$sqlDoss = "select distinct(id_etape) from p_ldt ".$filtrePeriode ;
+
+		$rsDoss=$this->cnx->query($sqlDoss);
+		$str = "<table class='je'>";
+		$ii = 0; 
+		
+		//return $sqlDoss;
+		/*
+		
+		lister les etapes concerné
+		
+		
+		*/
+		foreach($rsDoss as $rowDoss)
+		{
+			$etape = $rowDoss['id_etape'];
+			$sql = "SELECT date_deb_ldt, h_deb, h_fin, num_dossier, p_etape.libelle  FROM p_ldt 
+					LEFT JOIN p_dossier ON p_ldt.id_dossier=p_dossier.id_dossier
+					LEFT JOIN p_lien_oper_dossier ON p_ldt.id_etape=p_lien_oper_dossier.id_lien 
+					LEFT JOIN p_etape ON p_lien_oper_dossier.id_oper=p_etape.id_etape
+					$filtrePeriode AND p_ldt.id_etape = $etape order by p_ldt.date_deb_ldt, p_ldt.h_deb";
+			
+			$rs=$this->cnx->query($sql);
+			$diff;
+			$somme="0:0:0";
+			
+			//return $sql;
+			foreach($rs as $row)
+			{
+				if ($row['h_deb'] == "" || $row['h_fin'] == "") continue;
+				$diff = $this->hDiff($row['h_deb'], $row['h_fin'], "");
+				$somme = $this->hDiff($somme, $diff, "+");
+			}
+			
+			if ($ii >= 3) $ii = 0;
+			$cl = 'classe'.$ii;
+			$ii++;
+			
+			$nomDossier = $row['num_dossier'];
+			if ($nomDossier == "") $nomDossier  = "Hors prod";
+			$str .= "<tr class = $cl>";
+			$str .= "<td>".$periode."</td>";
+			$str .= "<td>".$nomDossier."</td>";
+			$str .= "<td>".$row['libelle']."</td>";
+			$str .= "<td>".$somme."</td>";
+			$str .= "</tr>";
+		}
+		$str .= "</table>";
+		return $str;
+	}
+	
+	
+	function getLstDossier()
+	{
+		$sql = "SELECT p_affectation.id_dossier,p_dossier.num_dossier FROM p_affectation LEFT JOIN p_dossier ON p_affectation.id_dossier = p_dossier.id_dossier WHERE id_pers=" .$_SESSION['id']. " AND id_etat = 0 ORDER BY num_dossier ASC";
+		$rs=$this->cnx->query($sql);
+		$str="";
+		//return $sql;
+		while($arr = $rs->fetch())
+		{
+			$str .= '<option value="'.$arr['id_dossier'].'">'.$arr['num_dossier'].'</option>';
+		}
+		
+		return $str;
+	}
+	function getLstDosdsier()
+	{
+		$sql = "select id_dossier, num_dossier from p_dossier  where id_etat <> 4 order by num_dossier";
+		$rs=$this->cnx->query($sql);
+		$str="";
+		while($arr = $rs->fetch())
+		{
+			$str .= '<option value="'.$arr['id_dossier'].'">'.$arr['num_dossier'].'</option>';
+		}
+		
+		return $str;
+	}
+	function getLotClient($idDossier)
+	{
+		$sql = "select id_lotclient, libelle from p_lot_client WHERE id_dossier = $idDossier AND id_etat <> 2 order by id_lotclient DESC";
+		$rs=$this->cnx->query($sql);
+		$str='<option value=""> </option>';
+		while($arr = $rs->fetch())
+		{
+			$str .= '<option value="'.$arr['id_lotclient'].'">'.$arr['libelle'].'</option>';
+		}
+		return $str;
+	}
+	function getSuiviDossier($pDate, $pEtape, $pMat, $pTypeEtape, $Dossier)
+	{
+		$date = " And p_ldt.date_deb_ldt = '" . $pDate . "'";
+		if($pDate == "") $date = "";
+		
+		$matricule = " And p_ldt.id_pers = " . $pMat ;
+		if($pMat == "") $matricule = "";
+		
+		$typeEtape = " And p_ldt.id_type_ldt = " . $pTypeEtape ;
+		if($pTypeEtape == "") $typeEtape = "";
+		
+		$numDossier = " And p_ldt.id_dossier = " . $Dossier ;
+		if($Dossier == "") $numDossier = "";
+		
+		$etape = " And p_ldt.id_etape = " . $pEtape ;
+		if($pEtape == "") $etape = "";
+
+		$filtre = $date.$matricule.$typeEtape.$numDossier.$etape;
+		
+		$sql = "SELECT p_ldt.date_deb_ldt, r_personnel.appelation, r_personnel.matricule, p_dossier.num_dossier,p_etape.libelle as etapLibelle, p_ldt.h_deb, p_ldt.h_fin,r_personnel.departement, p_type_ldt.libelle  FROM p_ldt 
+				LEFT JOIN p_dossier ON p_ldt.id_dossier=p_dossier.id_dossier 
+				LEFT JOIN p_lot_client ON p_ldt.id_lotclient=p_lot_client.id_lotclient  
+				LEFT JOIN p_lien_oper_dossier ON p_ldt.id_etape=p_lien_oper_dossier.id_lien 
+				LEFT JOIN p_etape ON p_lien_oper_dossier.id_oper=p_etape.id_etape
+				LEFT JOIN p_type_ldt on p_type_ldt.id_type_ldt = p_ldt.id_type_ldt
+				LEFT JOIN r_personnel ON r_personnel.id_pers=p_ldt.id_pers 
+				where 1=1".$filtre;
+				
+		//return $sql;
+		$rs=$this->cnx->query($sql);
+      
+		$str = "<table class='tbLate'>";
+		$ii = 0; 
+		
+		$diff;
+		$somme="0:0:0";
+
+		foreach($rs as $row)
+		{
+			if ($ii == 3) $ii = 0;
+			if ($row['h_deb'] == "" || $row['h_fin'] == "") continue;
+			$diff = $this->hDiff($row['h_deb'], $row['h_fin'], "");
+			$somme = $this->hDiff($somme, $diff, "+");
+
+			$cl = 'classe'.$ii;
+			$ii++;
+			$str .= "<tr class = $cl>";
+			$str .= "<td>".$row['h_deb']."</td>";
+			$str .= "<td>".$row['h_fin']."</td>";
+			$str .= "<td>".$diff."</td>";
+			$str .= "<td>".$somme."</td>";
+			$str .= "</tr>";
+		}
+		$str .= "</table>";
+		return $str;
+	}
+
+    function getLate($date,$dpt)
+    {
+      
+      $qdate="";
+      $qdpt="";
+      if ($date != "")
+      {
+        $qdate=" AND r_retard.date_retard='" .$date. "'"; 
+      }
+      if ($dpt != "")
+      {
+		$qdpt=" AND r_retard.id_pers = r_personnel.id_pers AND r_personnel.departement = '".$dpt."' ";
+      }
+      $sql_Late="SELECT r_retard.id_pers as matricule, r_personnel.nom as nom, r_personnel.prenom as prenom, r_retard.heure_entree_theo as heure_entree_theo , r_retard.heure_entree_reel as heure_entree_reel, r_retard.duree_retard as duree_retard, r_retard.date_retard as date_retard FROM r_personnel, r_retard WHERE r_personnel.id_pers = r_retard.id_pers";
+      $sql_Late .=$qdate.$qdpt;
+      $sql_Late .=" ORDER BY r_retard.id_retard ";
+	  
+      $rs_Late=$this->cnx->query($sql_Late);
+      
+      $str = "<table class='tbLate'><thead><tr><th>Matricule</th>
+			<th>Nom</th>
+			<th>Prenom</th>
+			<th>Heure entree theorique</th>
+			<th>Heure arrivee</th>
+			<th>Duree retard</th>
+			<th>Date retard</th></tr></thead>";
+		$ii = 0; 
+      
+     
+		foreach($rs_Late as $row)
+		{
+			if ($ii == 3) $ii = 0;
+
+				$cl = 'classe'.$ii;
+				$ii++;
+				$str .= "<tr class = $cl>";
+				$str .= "<td>".$row['matricule']."</td>";
+				$str .= "<td>".$row['nom']."</td>";
+				$str .= "<td>".$row['prenom']."</td>";
+				$str .= "<td>".$row['heure_entree_theo']."</td>";
+				$str .= "<td>".$row['heure_entree_reel']."</td>";
+				$str .= "<td>".$row['duree_retard']."</td>";
+				$str .= "<td>".$row['date_retard']."</td>";
+				$str .= "</tr>";
+		  
+		}
+		$str .= "</table>";
+		return $str;
+    }
+		
+	function getDateAbs()
+    {
+      $sql = "SELECT distinct(date_abs) FROM r_absence  ORDER BY date_abs ASC";
+      $rs=$this->cnx->query($sql);
+      $str="";
+      while($arr = $rs->fetch())
+      {
+        $str .= '<option value="'.$arr['date_abs'].'">'.$arr['date_abs'].'</option>';
+      }
+      return $str;
+    } 
+    
+    
+    function getListAbsence($date)
+    {
+      if ($date=="")
+        $sql_abs= "select id_abs, r_absence.id_pers,r_personnel.nom ,r_personnel.prenom, date_abs,motif from r_absence ,r_personnel where r_absence.id_pers=r_personnel.id_pers ";
+      else
+      {
+        $sql_abs= "select id_abs, r_absence.id_pers,r_personnel.nom ,r_personnel.prenom , date_abs,motif from r_absence,r_personnel where r_absence.id_pers=r_personnel.id_pers and date_abs='".$date."'";
+      }
+      $ii = 0;         
+             
+      $rs=$this->cnx->query($sql_abs);
+      $str= "<table class='tbAbsence'>
+      <thead>
+        <tr>
+          <th>Identifiant absence </th>
+          <th>Identifiant Personnel </th>
+          <th>Nom </th>
+          <th>Prenom </th>
+          <th>Date Absence </th>
+          <th>Motif </th>
+        </tr>
+      </thead>";
+      while($arr = $rs->fetch())    
+      {    
+         if ($ii == 3) $ii = 0;
+        
+         $cl = 'classe'.$ii;
+         $ii++;
+         $str .= "<tr class= $cl>";
+         $str .="<td>".$arr['id_abs']."</td>"; 
+         $str .= "<td>".$arr['id_pers']."</td>";
+         $str .= "<td>".$arr['nom']."</td>";
+         $str .= "<td>".$arr['prenom']."</td>";
+         $str .= "<td>".$arr['date_abs']."</td>";
+         $str .= "<td>".$arr['motif']."</td>";
+         $str .="</tr>";      
+      }
+      $str .="</table>";
+      return $str;
+    }
+			
+		// Retourne les lignes de temps
+		// $p_type_get in ('tous', 'util', 'proj', 'appli')
+		function get_ldt($p_type_get, $p_param, $p_deb, $p_fin)
+		{
+			
+			$sql = "select ldt.id, util.login, ldt.id_appli, ldt.debut, ldt.fin, ldt.commentaires, typ.designation";
+			$sql = $sql." from ldt, utilisateurs as util, types_ldt as typ";
+			$sql = $sql." where ldt.id_util=util.id and ldt.id_type=typ.id";
+			
+			switch ($p_type_get)
+			{
+				case 'util':
+					$sql = $sql." and util.login='$p_param'";
+					break;
+				case 'proj':
+					$sql = $sql." and ldt.id_appli in (select appli.id from applications as appli, projets as proj";
+					$sql = $sql." where appli.id_proj=proj.id and proj.designation='$p_param')";
+					break;
+				case 'appli':
+					$sql = $sql." and ldt.id_appli=(select id from applications where designation='$p_param')";
+					break;
+			}
+			if ($p_deb)
+			{
+				$sql = $sql." and ldt.debut > $p_deb";
+			}
+			if ($p_fin)
+			{
+				$sql = $sql." and ldt.debut < $p_deb + 1";
+			}
+			$rs = $cnx->Execute($sql);
+			$res = $rs->GetArray();
+			$rs->Close();
+			
+			return $res;
+		}
+		
+		function insertLDT($P, $O, $S, $C, $Q, $E)
+		{
+			$d= date("Y/m/d", time());
+			$h= date("H:m:s", time());
+			$U = $_SESSION['id'];
+			$sql = "INSERT INTO p_ldt (d_date, h_deb, projet, operation, statut, id_util, commentaire, quantite, nbre_erreur) values ('$d','$h','$P','$O', '$S', $U, '$C', '$Q', '$E')";
+			if ($this->cnx->exec($sql))
+			{
+				return 1;
+			}
+			return 0;
+		}
+
+		function getLDG()
+		{
+			$sql = "SELECT distinct(num_dossier), id_dossier FROM p_dossier where id_etat <> 4 order by num_dossier";
+			$rs=$this->cnx->query($sql);
+			$str='<option value="_"> </option>';
+			while($arr = $rs->fetch())
+			{
+				$str .= '<option value="'.$arr['id_dossier'].'">'.$arr['num_dossier'].'</option>';
+			}
+			return $str;
+		}
+		
+		function getNumDossier($idDossier)
+		{
+			$sql = "SELECT num_dossier FROM p_dossier where id_dossier=$idDossier";
+			$rs=$this->cnx->query($sql);
+			while($arr = $rs->fetch()) return $arr['num_dossier'];
+		}
+		
+		function getDepartement()
+		{
+			$sql = "SELECT libelle, id FROM r_departement";
+			$rs=$this->cnx->query($sql);
+			$str='<option value="_"> </option>';
+			while($arr = $rs->fetch())
+			{
+				$str .= '<option value="'.$arr['id'].'">'.$arr['libelle'].'</option>';
+			}
+			return $str;
+		}
+		function getEtats()
+		{
+			$sql = "SELECT distinct(id_etat), libelle FROM p_etat";
+			$rs=$this->cnx->query($sql);
+			$str='<option value="_"> </option>';
+			while($arr = $rs->fetch())
+			{
+				$str .= '<option value="'.$arr['id_etat'].'">'.$arr['libelle'].'</option>';
+			}
+			return $str;
+		}
+		
+		function getTypeLdt()
+		{
+			$sql = "SELECT id_type_ldt, libelle FROM p_type_ldt";
+			$rs=$this->cnx->query($sql);
+			$str="";
+			while($arr = $rs->fetch())
+			{
+				$str .= '<option value="'.$arr['id_type_ldt'].'">'.$arr['libelle'].'</option>';
+			}
+			echo $str;
+		}
+		function getTaches()
+		{
+			$sql = "SELECT distinct(libelle), id_etape FROM p_etape";
+			$rs=$this->cnx->query($sql);
+			$str='<option value="_"> </option>';
+			while($arr = $rs->fetch())
+			{
+				$str .= '<option value="'.$arr['id_etape'].'">'.$arr['libelle'].'</option>';
+			}
+			return $str;
+		}
+		function identification($log, $mdp)
+		{
+			$sql = "select nom, prenom , id_pers, id_droit from r_personnel where matricule = '$log' and mdp = '$mdp'";
+
+			$rs=$this->cnx->query($sql);
+
+			while($arr = $rs->fetch())
+			{
+				$_SESSION['pseudo'] = $arr['nom']. "  ".$arr['prenom'];
+				$_SESSION['id'] 	= $arr['id_pers'];
+				$_SESSION['id_droit'] 	= $arr['id_droit'];
+				
+				$P = 'connection';
+				$O = 'connection sur GPAO WEB';
+				$S = 'OK';
+				
+				$d= date("Y/m/d", time());
+				$h= date("H:m:s", time());
+				$ip = $_SERVER['REMOTE_ADDR'];
+
+				$sql = "INSERT INTO r_pointage (id_util, entree, pdate, source) VALUES (".$arr['id_pers'].", '$h', '$d', '$ip')";
+				if ($this->cnx->exec($sql))
+				{
+					return 1;
+				}
+			}
+			return 0;
+		}
+		function getDatePt()
+		{
+			$sql = "SELECT distinct(pdate) FROM r_pointage   ORDER BY pdate DESC";
+			$rs=$this->cnx->query($sql);
+			$str="";
+			while($arr = $rs->fetch())
+			{
+				$str .= '<option value="'.$arr['pdate'].'">'.$arr['pdate'].'</option>';
+			}
+			return $str;
+		}
+		function getMoisPt()
+		{
+			$sql = "SELECT distinct(substr(pdate, 0, length(pdate)-2)) as mois FROM r_pointage";
+			$rs=$this->cnx->query($sql);
+			$str="";
+			while($arr = $rs->fetch())
+			{
+				$str .= '<option value="'.$arr['mois'].'">'.$arr['mois'].'</option>';
+			}
+			//echo "-------".$str;exit();
+			return $str;
+		}
+
+		function lstPointage($datePt, $matriPt, $typePoint, $departement)
+		{
+			
+			
+			$qDate="";
+			$qMatri="";
+			$qType="";
+			
+			
+			if ($matriPt != "")
+			{
+				$qMatri = " AND id_util = ".$matriPt;
+			}
+			if ($datePt != "")
+			{
+				$qDate = " AND pdate = '".$datePt."'";
+			}
+			
+			if ($typePoint != "")
+			{
+				$qType = " AND source = '".$typePoint."'";
+			}
+			else 
+			{
+				$qType = " AND source IN ('IN', 'OUT','IN_ARO', 'OUT_ARO', 'IN_RDJ', 'OUT_RDJ') ";
+			}
+			if ($departement != "")
+			{
+				$qType .= " AND id_departement = '".$departement."'";
+			}
+			
+			$sql = "SELECT r_personnel.matricule, r_pointage.pdate, r_pointage.entree, r_pointage.sortie, r_pointage.id_pointage, r_personnel.nom, r_personnel.prenom, r_pointage.source FROM r_pointage INNER JOIN r_personnel ON  r_pointage.id_util = r_personnel.id_pers LEFT JOIN r_departement ON r_personnel.id_departement = r_departement.id WHERE 1=1 ";
+			
+			$sql .= $qType;
+			$sql .= $qDate.$qMatri;
+
+			$sql .= " ORDER BY pdate, entree ASC";
+
+			//return $sql;
+			$rs=$this->cnx->query($sql);
+			
+			$ii = 0;
+			$str = "<table id='listePointage'><thead><tr><th>Nom</th>
+			<th>Prenom</th>
+			<th>Matricule</th>
+			<th>Date</th>
+			<th>entree</th>
+			<th>Pointeuse</th></tr></thead>";
+
+			while($arr = $rs->fetch())
+			{
+				if ($ii == 3) $ii = 0;
+				
+				$cl = 'classe'.$ii;
+				$ii++;
+				$str .= "<tr class = $cl>";
+				$str .= "<td>".$arr['nom']."</td>";
+				$str .= "<td>".$arr['prenom']."</td>";
+				$str .= "<td>".$arr['matricule']."</td>";
+				$str .= "<td>".$arr['pdate']."</td>";
+				$str .= "<td>".$arr['entree']."</td>";
+				$str .= "<td>".$arr['source']."</td>";
+				$str .= "</tr>";
+			}
+			$str .= "</table>";
+			return $str;
+		}
+		function lstPointagePlat($datePt, $matriPt, $typePoint, $departement)
+		{
+			$qDate="";
+			$qMatri="";
+			$qType="";
+			
+			
+			if ($matriPt != "")
+			{
+				$qMatri = " AND id_util = ".$matriPt;
+			}
+			if ($datePt != "")
+			{
+				$qDate = " AND pdate = '".$datePt."'";
+			}
+			if ($typePoint != "")
+			{
+				$qType = " AND source = '".$typePoint."'";
+			}
+			else 
+			{
+				$qType = "";
+			}
+			if ($departement != "")
+			{
+				$qType .= " AND Departement = '".$departement."'";
+			}
+			
+			$sql = "SELECT id, pdate, id_util, in1, out1, in2, out2, valide, commentaire, err_type FROM r_pointage_jour WHERE id <> 1 ";
+			
+			$sql .= $qType;
+			$sql .= $qDate.$qMatri;
+			
+			$sql .= " ORDER BY pdate ASC";
+
+			$rs=$this->cnx->query($sql);
+			//return $sql;
+			//exit();
+			$ii = 0;
+			$str = "<table class='tbPointage'><thead>
+			<th>ID</th>
+			<th>DATE</th>
+			<th>Matricule</th>
+			<th>Entree 1</th>
+			<th>Sortie 1</th>
+			<th>Entree 2</th>
+			<th>Sortie 2</th>
+			<th>ANOMALIE</th>
+			<th>Commentaires</th>
+			<th>Type</th></tr></thead>";
+
+			while($arr = $rs->fetch())
+			{
+				if ($ii == 3) $ii = 0;
+				
+				$cl = 'classe'.$ii;
+				$ii++;
+				$str .= "<tr class = $cl>";
+				$str .= "<td>".$arr['id']."</td>";
+				$str .= "<td>".$arr['pdate']."</td>";
+				$str .= "<td>".$arr['id_util']."</td>";
+				$str .= "<td>".$arr['in1']."</td>";
+				$str .= "<td>".$arr['out1']."</td>";
+				$str .= "<td>".$arr['in2']."</td>";
+				$str .= "<td>".$arr['out2']."</td>";
+				$str .= "<td>".$arr['valide']."</td>";
+				$str .= "<td>".$arr['commentaire']."</td>";
+				$str .= "<td>".$arr['err_type']."</td>";
+				$str .= "</tr>";
+			}
+			$str .= "</table>";
+			return $str;
+		}
+		
+		//§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§
+		
+		function util_existe($p_login)
+		{
+			$sql = "select matricule from personnel where matricule = '$p_login'";
+
+			$rs=$this->cnx->query($sql);
+			$arr = $rs->fetch();
+			return $arr['matricule'];
+		}
+
+		// Test si un projet existe
+		// Retourne l'id si le projet existe, sinon retourne false
+		function assign_existe($p_login, $p_design_proj)
+		{
+			$v_id_util = util_existe($p_login);
+			$v_id_proj = proj_existe($p_design_proj);
+			if ($v_id_util)
+			{
+				if ($v_id_proj)
+				{
+					
+					$sql = "select id_util from proj_util where id_util=$v_id_util and id_proj=$v_id_proj";
+					$rs = $cnx->Execute($sql);
+					if ($rs)
+					{
+						$arr = $rs->FetchRow();
+						$rs->Close();
+						
+						return $arr['id_util'];
+					}
+					else
+					{
+						
+						return false;
+					}			
+				}
+				else
+				{
+					return false;
+				}
+			}
+			else
+			{
+				return false;
+			}
+		}
+
+		######################################
+
+		// Test si un type de ligne de temps existe
+		// Retourne l'id du type, sinon retourne false
+		function type_ldt_existe($p_design)
+		{
+			$sql = "select id from types_ldt where designation = '$p_design'";
+			$rs = $cnx->Execute($sql);
+			$arr = $rs->FetchRow();
+			$rs->Close();
+			
+			return $arr['id'];
+		}
+
+		######################################
+
+		// Retourne l'id de l'application, sinon retourne false
+		function proj_appli_existe($p_des_proj, $p_des_appli)
+		{
+			
+			$sql = "select appli.id from applications as appli, projets as proj where appli.designation = '$p_des_appli' and proj.designation='$p_des_proj' and proj.id=appli.id_proj";
+			$rs = $cnx->Execute($sql);
+			if ($rs)
+			{
+			$arr = $rs->FetchRow();
+			$rs->Close();
+			
+			return $arr['id'];
+			}
+			else
+			{
+				$_SESSION['error_msg'] = 'Projet et application ne concordent pas';
+				return false;
+			}
+		}
+
+		##############################################################
+		######################      INSERTIONS     ##########################
+		##############################################################
+
+		// Ajout d'un utilisateur
+		// Retourne true si succès, sinon false et error_msg
+		function ajout_util($p_login, $p_pwd)
+		{
+			$id_util = util_existe($p_login);
+			if ($id_util)
+			{
+				$_SESSION['error_msg'] = 'Utilisateur déjà existant';
+				return false;
+			}
+			else
+			{
+				
+				$sql = "insert into utilisateurs(id, login, pwd) values (nextval('utilisateurs_seq_id'), '$p_login', '$p_pwd')";
+				$rs = $cnx->Execute($sql);
+				if ($rs)
+				{
+					$rs->Close();
+					
+					return true;
+				}
+				else
+				{
+					
+					$_SESSION['error_msg'] = 'Insertion dans la base impossible';
+					return false;
+				}
+			}
+		}
+
+		######################################
+
+		// Ajout d'un projet
+		// Retourne true si succès, sinon false et error_msg
+		function ajout_proj($p_design)
+		{
+			$id_proj = proj_existe($p_design);
+			if ($id_proj)
+			{
+				$_SESSION['error_msg'] = 'Projet déjà existant';
+				return false;
+			}
+			else
+			{
+				
+				$sql = "insert into projets(id, designation) values (nextval('projets_seq_id'), '$p_design')";
+				$rs = $cnx->Execute($sql);
+				if ($rs)
+				{
+					$rs->Close();
+					
+					return true;
+				}
+				else
+				{
+					
+					$_SESSION['error_msg'] = 'Insertion dans la base impossible';
+					return false;
+				}
+			}
+		}
+
+		######################################
+
+		// Ajout d'une application
+		// Retourne true si succès, sinon false et error_msg
+		function ajout_appli($p_design_proj, $p_design_appli)
+		{
+			$id_appli = proj_appli_existe($p_design_proj, $p_design_appli);
+			if ($id_appli)
+			{
+				$_SESSION['error_msg'] = 'Application déjà existante';
+				return false;
+			}
+			else
+			{
+				$v_id_proj = proj_existe($p_design_proj);
+				if ($v_id_proj)
+				{
+					
+					$sql = "insert into applications(id, designation, id_proj) values (nextval('applications_seq_id'), '$p_design_appli', $v_id_proj)";
+					$rs = $cnx->Execute($sql);
+					if ($rs)
+					{
+						$rs->Close();
+						
+						return true;
+					}
+					else
+					{
+						
+						$_SESSION['error_msg'] = 'Insertion dans la base impossible';
+						return false;
+					}
+				}
+				else
+				{
+					$_SESSION['error_msg'] = 'Projet inexistant';
+					return false;
+				}
+			}
+		}
+
+		######################################
+
+		// Assigner un projet à un utilisateur
+		// Met l'erreur à 'utilisateur inéxistant' ou 'projet inexistant' et retourne false si l'utilisateur ou le projet n'existe pas, sinon assigne le projet à l'utilisateur et retoune true
+		function assign_projet($p_des_proj, $p_login)
+		{
+			$v_id_util = util_existe($p_login);
+			if ($v_id_util)
+			{
+				$v_id_proj = proj_existe($p_des_proj);
+				if ($v_id_proj)
+				{
+					
+					$sql = "insert into proj_util(id_proj, id_util) values ($v_id_proj, $v_id_util)";
+					$rs = $cnx->Execute($sql);
+					if ($rs)
+					{
+						$rs->Close();
+						
+						return true;
+					}
+					else			
+					{				
+						$_SESSION['error_msg'] = 'Insertion dans la base impossible';
+						
+						return false;
+					}
+				}
+				else
+				{
+					$_SESSION['error_msg'] = 'Projet inéxistant';
+					return false;
+				}
+			}
+			else
+			{
+				$_SESSION['error_msg'] = 'Utilisateur inéxistant';
+				return false;
+			}
+		}
+
+		######################################
+
+		// Ajoute type de ligne de temps
+		// Retourne true si succès, sinon false et error_msg
+		function ajout_type_ldt($p_design, $p_comment)
+		{
+			$id_type_ldt = type_ldt_existe($p_design);
+			if ($id_type_ldt)
+			{
+				$_SESSION['error_msg'] = 'Type déjà existant';
+				return false;
+			}
+			else
+			{
+				
+				$sql = "insert into types_ldt(id, designation, commentaires) values (nextval('types_ldt_seq_id'), '$p_design', '$p_comment')";
+				$rs = $cnx->Execute($sql);
+				if ($rs)
+				{
+					$rs->Close();
+					
+					return true;
+				}
+				else
+				{
+					
+					$_SESSION['error_msg'] = 'Insertion dans la base impossible';
+					return false;
+				}
+			}
+		}
+
+		######################################
+
+		// Ajoute une ligne de temps
+		// Retourne true si succès, sinon false et error_msg
+		function ajout_ldt($p_type_ajout, $p_id_ldt, $p_log_util, $p_des_proj, $p_des_appli, $p_des_type_ldt, $p_deb, $p_fin, $p_comment)
+		{
+			$id_util = util_existe($p_log_util);
+			$id_proj = proj_existe($p_des_proj);
+			$id_appli = proj_appli_existe($p_des_proj, $p_des_appli);
+			$id_type_ldt = type_ldt_existe($p_des_type_ldt);
+			if ($p_type_ajout != "fin")
+			{
+				if (!$id_util)
+				{
+					$_SESSION['error_msg'] = 'Utilisateur inéxistant';
+					return false;
+				}
+				if (!$id_proj)
+				{
+					$_SESSION['error_msg'] = 'Projet inéxistant';
+					return false;
+				}
+				if (!assign_existe($p_log_util, $p_des_proj))
+				{
+					$_SESSION['error_msg'] = "L'utilisateur $p_log_util n'est pas affecté au projet $p_des_proj";
+					return false;
+				}
+				if (!$id_appli)
+				{
+					$_SESSION['error_msg'] = "L'application $p_des_appli ne concorde pas au projet $p_des_proj";
+					return false;
+				}
+				if (!$id_type_ldt)
+				{
+					$_SESSION['error_msg'] = 'Type de ligne de temps inéxistant';
+					return false;
+				}
+			}	
+			
+			switch ($p_type_ajout)
+			{
+				case "insert":
+					// Insertion nouvelle ligne complète
+					$sql = "insert into ldt(id, id_util, id_appli, debut, fin, commentaires, id_type)";
+					$sql = $sql." values (nextval('ldt_seq_id'), $id_util, $id_appli, $p_deb, $p_fin, '$p_comment', $id_type_ldt)";
+					/*
+					SELECT id_ldt, id_util, machine, h_deb, h_fin, lot_oper, id_proj, id_ldg, 
+					id_ldw, etat, duree, quantite, quant_reel, nbre_erreur, id_tache, 
+					commentaire, date_deb, date_fin, id_equipe
+					  FROM ldt;
+					  */
+					break;
+				case "debut":
+				// Insertion sans fin
+					$sql = "insert into ldt(id, id_util, id_appli, debut, fin, commentaires, id_type)";
+					$sql = $sql." values (nextval('ldt_seq_id'), $id_util, $id_appli, cast (now() as timestamp without time zone), null, '$p_comment', $id_type_ldt)";
+					break;
+				case "fin":
+				// Terminer une ligne
+					$sql = "update ldt set fin = cast (now() as timestamp without time zone) where id = $p_id_ldt";
+					break;
+			}	
+			$rs = $cnx->Execute($sql);
+			if ($rs)
+			{
+				return true;
+			}
+			else
+			{
+				$_SESSION['error_msg'] = 'Insertion dans la base impossible';
+				return false;
+			}	
+		}
+
+		##############################################################
+		######################      SUPPRESSIONS     ##########################
+		##############################################################
+
+		// Suppression d'un utilisateur
+		// Retourne true, sinon error_msg
+		function delete_util($p_login)
+		{
+			$v_id_util = util_existe($p_login);
+			if ($v_id_util)
+			{
+				
+				$sql = "delete from proj_util where id_util=$v_id_util";
+				$rs = $cnx->Execute($sql);
+				if ($rs)
+				{
+					$rs->Close();
+					$sql = "delete from utilisateurs where id=$v_id_util";
+					$rs = $cnx->Execute($sql);
+					if ($rs)
+					{
+						$rs->Close();
+						
+						return true;
+					}
+					else
+					{
+						$_SESSION['error_msg'] = 'Suppression dans la base impossible';
+						
+						return false;				
+					}
+				}
+				else
+				{
+					$_SESSION['error_msg'] = 'Suppression dans la base impossible';
+					
+					return false;
+				}
+			}
+			else
+			{
+				$_SESSION['error_msg'] = 'Utilisateur inéxistant';
+				return false;
+			}
+		}
+
+		####################################
+
+		// Suppression d'un projet
+		// Retourne true, sinon error_msg
+		function delete_proj($p_des_proj)
+		{
+			$v_id_proj = proj_existe($p_des_proj);
+			if ($v_id_proj)
+			{
+				
+				$cnx->StartTrans();
+				$sql_1 = "delete from proj_util where id_proj=$v_id_proj";
+				$rs_1 = $cnx->Execute($sql_1);
+				$sql_2 = "delete from applications where id_proj=$v_id_proj";
+				$rs_2 = $cnx->Execute($sql_2);
+				$cnx->CompleteTrans();
+				if ($rs_1 && $rs_2)
+				{
+					$rs_1->Close();
+					$rs_2->Close();
+					$sql = "delete from projets where id=$v_id_proj";
+					$rs = $cnx->Execute($sql);
+					if ($rs)
+					{
+						$rs->Close();
+						
+						return true;
+					}
+					else
+					{
+						$_SESSION['error_msg'] = 'Suppression dans la base impossible';
+						
+						return false;				
+					}
+				}
+				else
+				{
+					$_SESSION['error_msg'] = 'Suppression dans la base impossible';
+					
+					return false;
+				}
+			}
+			else
+			{
+				$_SESSION['error_msg'] = 'Projet inéxistant';
+				return false;
+			}
+		}
+
+		####################################
+
+		// Suppression d'un utilisateur
+		// Retourne true, sinon error_msg
+		function delete_appli($p_des_proj, $p_des_appli)
+		{
+			$v_id_appli = proj_appli_existe($p_des_proj, $p_des_appli);
+			if ($v_id_appli)
+			{
+				
+				$sql = "delete from applications where id=$v_id_appli";
+				$rs = $cnx->Execute($sql);
+				if ($rs)
+				{
+					$rs->Close();
+					
+					return true;
+				}
+				else
+				{
+					$_SESSION['error_msg'] = 'Suppression dans la base impossible';
+					
+					return false;				
+				}
+			}
+			else
+			{
+				$_SESSION['error_msg'] = 'Application inéxistante';
+				return false;
+			}
+		}
+
+		######################################
+
+		// UnAssigner un projet à un utilisateur
+		// Met l'erreur à 'utilisateur inéxistant' ou 'projet inexistant' et retourne false si l'utilisateur ou le projet n'existe pas, sinon assigne le projet à l'utilisateur et retoune true
+		function unassign_projet($p_des_proj, $p_login)
+		{
+			if (assign_existe($p_login, $p_des_proj))
+			{
+				
+				$v_id_proj = proj_existe($p_des_proj);
+				$v_id_util = util_existe($p_login);
+				if ($v_id_proj && $v_id_util)
+				{
+					
+					$sql = "delete from proj_util where id_proj=$v_id_proj and id_util=$v_id_util";
+					$rs = $cnx->Execute($sql);
+					if ($rs)
+					{
+						$rs->Close();
+						
+						return true;
+					}
+					else
+					{
+						$_SESSION['error_msg'] = 'Suppression dans la base impossible';
+						return false;
+					}
+				}
+				else
+				{
+					return true;
+				}
+			}
+			else
+			{
+				return true;
+			}
+				
+		}
+
+		####################################
+
+		// Suppression d'un type de ligne de temps
+		// Retourne true, sinon error_msg
+		function delete_type_ldt($p_des_type)
+		{
+			$v_id_type = type_ldt_existe($p_des_type);
+			if ($v_id_type)
+			{
+				
+				$sql = "delete from types_ldt where id=$v_id_type";
+				$rs = $cnx->Execute($sql);
+				if ($rs)
+				{
+					$rs->Close();
+					
+					return true;
+				}
+				else
+				{
+					$_SESSION['error_msg'] = 'Suppression dans la base impossible';
+					
+					return false;				
+				}
+			}
+			else
+			{
+				$_SESSION['error_msg'] = 'Type inéxistant';
+				return false;
+			}
+		}
+
+		#####################################
+
+		// Supprime une ligne de temps
+		
+
+		##############################################################
+		######################      MODIFICATIONS     ##########################
+		##############################################################
+
+		// Modification du mot de passe d'un utilisateur
+		// Retourne true, sinon error_msg
+		function modif_pwd($p_login, $p_pwd)
+		{
+			$v_id_util = util_existe($p_login);
+			if ($v_id_util)
+			{
+				
+				$sql = "update utilisateurs set pwd='$p_pwd' where id=$v_id_util";
+				$rs = $cnx->Execute($sql);
+				if ($rs)
+				{
+					$rs->Close();
+					
+					return true;
+				}
+				else
+				{
+					
+					return false;
+				}
+			}
+			else
+			{
+				$_SESSION['error_msg'] = 'Utilisateur inéxistant';
+				return false;
+			}
+			
+		}
+
+		######################################
+
+		// Ajoute une ligne de temps
+		// Retourne true si succès, sinon false et error_msg
+		function modif_ldt($p_id_ldt, $p_log_util, $p_des_proj, $p_des_appli, $p_des_type_ldt, $p_deb, $p_fin, $p_comment)
+		{
+			$id_util = util_existe($p_log_util);
+			$id_proj = proj_existe($p_des_proj);
+			$id_appli = proj_appli_existe($p_des_proj, $p_des_appli);
+			$id_type_ldt = type_ldt_existe($p_des_type_ldt);
+			if (!$id_util)
+			{
+				$_SESSION['error_msg'] = 'Utilisateur inéxistant';
+				return false;
+			}
+			if (!$id_proj)
+			{
+				$_SESSION['error_msg'] = 'Projet inéxistant';
+				return false;
+			}
+			if (!assign_existe($p_log_util, $p_des_proj))
+			{
+				$_SESSION['error_msg'] = "L'utilisateur $p_log_util n'est pas affecté au projet $p_des_proj";
+				return false;
+			}
+			if (!$id_appli)
+			{
+				$_SESSION['error_msg'] = "L'application $p_des_appli ne concorde pas au projet $p_des_proj";
+				return false;
+			}
+			if (!$id_type_ldt)
+			{
+				$_SESSION['error_msg'] = 'Type de ligne de temps inéxistant';
+				return false;
+			}
+			
+			$sql = "update ldt set id_util=$id_util, id_appli=$id_appli, debut=$p_deb, fin=$p_fin, commentaires=$p_comment, id_type=$id_type_ldt)";
+			$sql = $sql." where id=$p_id_ldt";
+			$rs = $cnx->Execute($sql);
+			if ($rs)
+			{
+				return true;
+			}
+			else
+			{
+				$_SESSION['error_msg'] = 'Insertion dans la base impossible';
+				return false;
+			}	
+		}
+
+		##############################################################
+		######################      GET     ##########################
+		##############################################################
+
+		// Retourne les id et les designations des projets 
+		// Si $p_login != '' alors liste des projets assignés à un utilisateurs
+		function get_projets($p_type_get, $p_param)
+		{
+			switch ($p_type_get)
+			{
+				case 'tous':
+					$sql = "select id, designation from projets";
+					$sql = $sql." order by designation";
+					break;
+				case 'util':
+					$v_id_util = util_existe($p_param);
+					if ($v_id_util)
+					{
+						$sql = "select prj.id, prj.designation from projets as prj, proj_util as prj2 where prj2.id_util=$v_id_util and prj.id=prj2.id_proj";
+						$sql = $sql." order by prj.designation";
+					}
+					else
+					{
+						$_SESSION['error_msg'] = 'Utilisateur inéxistant';
+						return false;
+					}
+					break;
+			}	
+			
+			
+			$rs = $cnx->Execute($sql);
+			$res = $rs->GetArray();
+			$rs->Close();
+			
+			return $res;
+
+		}
+
+		##############################################################
+
+		// Retourne les id et les designations des applications 
+		// Si $p_design_proj != '' alors liste des applications d'un projet
+		function get_appli($p_type_get, $p_param)
+		{
+			switch ($p_type_get)
+			{
+				case 'tous':
+					$sql = "select id, designation from applications";
+					$sql = $sql." order by designation";
+					break;
+				case 'proj':
+					$v_id_proj = proj_existe($p_param);
+					if ($v_id_proj)
+					{
+						$sql = "select id, designation from applications where id_proj=$v_id_proj";
+						$sql = $sql." order by designation";
+					}
+					else
+					{
+						$_SESSION['error_msg'] = 'Projet inéxistant';
+						return false;
+					}
+					break;
+				case 'util':
+					$v_id_util = util_existe($p_param);
+					if ($v_id_util)
+					{
+						$sql = "select appli.id, appli.designation from applications appli, proj_util proj2";
+						$sql = $sql." where proj2.id_util=$v_id_util and appli.id_proj=proj2.id_proj";
+						$sql = $sql." order by appli.designation";
+					}
+					else
+					{
+						$_SESSION['error_msg'] = 'Projet inéxistant';
+						return false;
+					}
+					break;
+			}	
+
+			
+			$rs = $cnx->Execute($sql);
+			$res = $rs->GetArray();
+			return $res;
+
+		}
+
+		// Retourne un tableau associatif contenant le designation du projet et de l'appli associés à l'id de l'appli
+		function get_proj_appli($p_id_appli)
+		{
+			
+			//$sql = "select ldt.id, util.login, appli.designation, ";
+			$sql = "select projets.designation as des_proj, applications.designation as des_appli from projets, applications where projets.id=applications.id_proj and applications.id=$p_id_appli";
+			$rs = $cnx->Execute($sql);
+			$arr = $rs->FetchRow();
+			$rs->Close();
+			
+			return $arr;
+		}
+
+
+
+		##############################################################
+		######################      DATE     ##########################
+		##############################################################
+
+		// Convertit une date du format dd/mm/yyyy hh24:mi:ss en timestamp php
+		function str_to_tst($p_str)
+		{
+			$jour = substr($p_str, 0, 2);
+			$mois = substr($p_str, 3, 2);
+			$annee = substr($p_str, 6, 4);
+			$heure = substr($p_str, 11, 2);
+			$minute = substr($p_str, 14, 2);
+			$seconde = substr($p_str, 17, 2);
+			$res = mktime($heure, $minute, $seconde, $mois, $jour, $annee);
+			return $res;
+		}
+
+		// Teste si une date au format dd/mm/yyyy est valide
+		function date_valide($p_date)
+		{
+			$jour = substr($p_date, 0, 2);
+			$mois = substr($p_date, 3, 2);
+			$annee = substr($p_date, 6, 4);
+			if (is_numeric($jour) && is_numeric($mois) && is_numeric($annee))
+			{
+				if (checkdate($mois, $jour, $annee))
+				{
+					return true;
+				}
+				else
+				{
+					return false;
+				}
+			}
+			else
+			{
+				return false;
+			}
+		}
+		
+		function sec2hms ($sec, $padHours = false) 
+	  {
+
+			// start with a blank string
+			$hms = "";
+			
+			// do the hours first: there are 3600 seconds in an hour, so if we divide
+			// the total number of seconds by 3600 and throw away the remainder, we're
+			// left with the number of hours in those seconds
+			$hours = intval(intval($sec) / 3600); 
+
+			// add hours to $hms (with a leading 0 if asked for)
+			$hms .= ($padHours) 
+				  ? str_pad($hours, 2, "0", STR_PAD_LEFT). ":"
+				  : $hours. ":";
+			
+			// dividing the total seconds by 60 will give us the number of minutes
+			// in total, but we're interested in *minutes past the hour* and to get
+			// this, we have to divide by 60 again and then use the remainder
+			$minutes = intval(($sec / 60) % 60); 
+
+			// add minutes to $hms (with a leading 0 if needed)
+			$hms .= str_pad($minutes, 2, "0", STR_PAD_LEFT). ":";
+
+			// seconds past the minute are found by dividing the total number of seconds
+			// by 60 and using the remainder
+			$seconds = intval($sec % 60); 
+
+			// add seconds to $hms (with a leading 0 if needed)
+			$hms .= str_pad($seconds, 2, "0", STR_PAD_LEFT);
+
+			// done!
+			return $hms;
+		
+	  }
+
+		// Retourne la date actuelle au format : 15 Juin 1984
+		function date_actu()
+		{
+			$mois_num = date("m");
+					switch ($mois_num) {
+						case 01:
+							$mois_francais = "Janvier";
+							break;
+						case 02:
+							$mois_francais = "Février";
+							break;
+						case 03:
+							$mois_francais = "Mars";
+							break;
+						case 04:
+							$mois_francais = "Avril";
+							break;
+						case 05:
+							$mois_francais = "Mai";
+							break;
+						case 06:
+							$mois_francais = "Juin";
+							break;
+						case 07:
+							$mois_francais = "Juillet";
+							break;
+						case 08:
+							$mois_francais = "Août";
+							break;
+						case 09:
+							$mois_francais = "Septembre";
+							break;
+						case 10:
+							$mois_francais = "Octobre";
+							break;
+						case 11:
+							$mois_francais = "Novembre";
+							break;
+						case 12:
+							$mois_francais = "Décembre";
+							break;
+						}
+					$jour = date("d");
+					$annee = date("Y");
+					return $jour.' '.$mois_francais.' '.$annee;
+		}
+
+		// Compare deux dates : si fin > début alors retourne true, sinon false
+		function date_compare($p_deb, $p_fin)
+		{
+			if (date_valide($p_deb) && date_valide($p_fin))
+			{
+				$deb = str_to_tst($p_deb);
+				$fin = str_to_tst($p_fin);
+				if ($deb <= $fin)
+				{
+					return true;
+				}
+				else
+				{
+					return false;
+				}
+			}
+			else
+			{
+				return false;
+			}
+		}
+
+		##############################################################
+		######################      AUTHENTIFICATION     ##########################
+		##############################################################
+
+		// Authentification d'un utilisateur
+		// Retourne true si authentifié, sinon false
+		function log_in($p_login, $p_pwd)
+		{
+			
+			$sql = "select count(*) as nb from utilisateurs where login='$p_login' and pwd='$p_pwd'";
+			$rs = $cnx->Execute($sql);
+			if ($rs->fields['nb'] == 1)
+			{
+				$_SESSION['authentifie'] = true;
+				$_SESSION['login'] = $p_login;
+				return true;
+			}
+			else
+			{		
+				$_SESSION['error_msg']='Utilisateur inconnu';
+				log_out();
+				return false;
+			}	
+			$rs->Close();
+			
+		}
+
+		######################################
+
+		//Déconnexion
+		function log_out()
+		{
+			unset($_SESSION['authentifie']);
+			unset($_SESSION['login']);
+		}
+
+		##############################################################
+		######################      MENUS     ##########################
+		##############################################################
+
+		// Affichage des menus
+		function put_menu($p_profil)
+		{
+			
+			$sql_menu = "select id, designation, path from menus"; // where profil = $p_profil
+			$rs_menu = $cnx->Execute($sql_menu);
+			$menus = $rs_menu->GetArray();
+				for ($i=0; $i<count($menus); $i++)
+				{
+					echo '<ul class="select"><li>';
+					echo '<a href="index.php?page='.$menus[$i]['path'].'">'.$menus[$i]['designation'].'</a>';
+					echo '<ul class="sub">';
+						$sql_ssmenu = "select id, designation, path from sous_menus where id_menus = ".$menus[$i]['id'];
+						$rs_ssmenu = $cnx->Execute($sql_ssmenu);
+						$ssmenus = $rs_ssmenu->GetArray();
+						for ($j=0; $j<count($ssmenus); $j++)
+						{
+							echo '<li><a href="index.php?page='.$ssmenus[$j]['path'].'">'.$ssmenus[$j]['designation'].'</a></li>';
+						}
+					echo '</ul></li></ul>';
+				}
+			$rs_menu->Close();
+			$rs_ssmenu->Close();
+			
+}
+		
+		
+		
+		
+		
+		
+		
+		
+		
+	}
+
+	
+?>

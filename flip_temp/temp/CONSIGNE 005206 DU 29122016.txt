@@ -1,0 +1,12 @@
+Ci_joint les consignes : 
+Pour le visuel BVOPALERONBOEUF : merci de ne pas détourer la brindille verte au dessus de la viande et de masquer cette brindille sur la viande 
+- pour le visuel FLOIGNON : ne pas détourer le couteau 
+Sinon pour tous les visuels avec une assiette, détourer le produit avec l'assiette : 
+BVOPALERONBOEUF 
+BVOSAUCISSEPURPORC 
+FLOIGNON 
+2885417000007 avec le tissu dessous 
+8721800210018 
+2892167000003 
+2887374000007 produit + l'assiette 
+etc... 

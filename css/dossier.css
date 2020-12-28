@@ -1,0 +1,21 @@
+body {background:#134f72;text-align: center;font:12px tahoma, Arial, Helvetica, sans-serif;color:black;margin:0;}
+
+td > span, th>span {
+    display:block;
+    padding:20px;
+}
+th > span {
+    background-color:#eee;
+	
+}
+th{color:white;padding:15px;}
+table td, table th {
+    border:1px solid grey;
+    }
+table {
+    width:100%;
+}
+
+.classe0{background:#8cedfb;}
+.classe1{background:#d0f7fd;}
+.classe2{background:#ebfbfe;}

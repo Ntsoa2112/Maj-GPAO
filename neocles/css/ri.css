@@ -1,0 +1,49 @@
+.ri_art
+{
+  color : green ;
+  font-family : "Arial", Verdana, Ms sans Sérif;
+  font-weight:bold;
+  text-decoration:underline;
+  
+}
+.ri_sous-art
+{
+  color:black;
+  font-family:"Times New Roman", Verdana, Ms sans Sérif;
+  margin:20px;
+  
+}
+.ri_point
+{
+  color : black;
+  font-family : "Times New Roman", Verdana, Ms sans Sérif;
+  margin-left:40px;
+}
+.ri_titre
+{
+  color : Blue ;
+  font-family:"Times New Roman" ;
+  font-size:20px;
+  font-weight:bold;
+  text-align:center;
+  
+}
+.ri_tiret
+{
+  color : black;
+  font-family : "Times New Roman", Verdana, Ms sans Sérif;
+  margin-left:40px;
+}
+
+.ri_num
+{
+  font-weight:bold;
+  font-family : "Times New Roman", Verdana, Ms sans Sérif;
+  margin-left:20px;
+}
+.ri_sous-num
+{
+  font-family : "Times New Roman", Verdana, Ms sans Sérif;
+  margin:30px;
+}
+

@@ -1,0 +1,1 @@
+Détourer les visuels et réenregistrer en 300dpi, en cmjn, en eps. 

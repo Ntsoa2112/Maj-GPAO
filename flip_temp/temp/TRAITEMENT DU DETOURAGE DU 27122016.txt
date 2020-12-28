@@ -1,0 +1,4 @@
+7.84 DETOURAGE avec script et repère.
+
+7.83 DETOURAGE AVEC FOND BLANC
+6.83. SEQUENCE 800 (1100 x 1200) 72 dpi avec fond blanc, sans deplacement de visuels

@@ -1,0 +1,3 @@
+qu'il faudrait nous renvoyer au format .eps,
+ détourés et avec l'option "masque" activée 
+sur les tracés de détourage
