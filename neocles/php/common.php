@@ -4423,6 +4423,7 @@ $nbSaisie=0;
 			$resultat = $this->cnx->query($sql);
 			$nbr_Entre15_30 = $resultat->fetchAll();
 
+
 			//On rassemble les 3 tableaux dans une même tableau
 			for($i=0; $i<COUNT($nbr_Inf15);$i++){
 				$ajout = false;
@@ -4478,9 +4479,133 @@ $nbSaisie=0;
 					$tab[$nbr]["nbr_Entre15_30"] = $nbr_Entre15_30[$i]["resultat_15_30"];
 				}
 			}
-		
-			$donne = array( "1"=>$str , "2"=>$nbr_mails , "3"=>$mailsSup30, "4"=>$dessous15, "5"=>$mails15_30, "tableau"=>$tab );
+						//On rassemble les 3 tableaux dans une même tableau
+			for($i=0; $i<COUNT($nbr_Inf15);$i++){
+				$ajout = false;
+				if(COUNT($tab) !=0 ){
+					for($e=0; $e<COUNT($tab); $e++){
+						if($tab[$e]["date_arrivee"] == $nbr_Inf15[$i]["date_arrivee"]){
+							$tab[$e]["nbr_Inf15"] = $nbr_Inf15[$i]["resultat_inf15"];
+							$ajout = false;
+							break;
+						}
+						else{
+							$ajout = true;
+						}
+					}
+				}
+				else{
+					$ajout = true;
+				}
+				
 
+				if($ajout == true){
+					$nbr = COUNT($tab);
+					$tab[$nbr]["date_arrivee"] = $nbr_Inf15[$i]["date_arrivee"];
+					$tab[$nbr]["nbr_Inf15"] = $nbr_Inf15[$i]["resultat_inf15"];
+				}
+			}
+
+			for($i=0; $i<COUNT($nbr_Entre15_30);$i++){
+				$ajout = false;
+
+				if(COUNT($tab) !=0 ){
+					for($e=0; $e<COUNT($tab); $e++){
+						if(COUNT($tab) == 0){
+							$ajout = true;
+						}
+						elseif($tab[$e]["date_arrivee"] == $nbr_Entre15_30[$i]["date_arrivee"]){
+							$tab[$e]["nbr_Entre15_30"] = $nbr_Entre15_30[$i]["resultat_15_30"];
+							$ajout = false;
+							break;
+						}
+						else{
+							$ajout = true;
+						}
+					}
+				}
+				else{
+					$ajout = true;
+				}
+
+				if($ajout == true){
+					$nbr = COUNT($tab);
+					$tab[$nbr]["date_arrivee"] = $nbr_Entre15_30[$i]["date_arrivee"];
+					$tab[$nbr]["nbr_Entre15_30"] = $nbr_Entre15_30[$i]["resultat_15_30"];
+				}
+			}
+
+			// REQUETTE NOMBRE MAILS PAR INTERVENANT
+
+			$sql = $requete = "SELECT intervenant, COUNT(*) as resulat_sup30 FROM helpdesk WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) > ('00:30:00') GROUP BY intervenant;";
+			$resultat = $this->cnx->query($sql);
+			$tab_Intervenant = $resultat->fetchAll();
+
+			$sql = $requete = "SELECT intervenant, COUNT(*) AS resultat_inf15 FROM helpdesk WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) < ('00:15:00') GROUP BY intervenant;";
+			$resultat = $this->cnx->query($sql);
+			$nbr_Inf15 = $resultat->fetchAll();
+
+			$sql = $requete = "SELECT intervenant, COUNT(*) AS resultat_15_30 FROM helpdesk WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) BETWEEN ('00:15:00') AND ('00:30:00') GROUP BY intervenant;";
+			$resultat = $this->cnx->query($sql);
+			$nbr_Entre15_30 = $resultat->fetchAll();
+
+			//On rassemble les 3 tableaux dans une même tableau
+			for($i=0; $i<COUNT($nbr_Inf15);$i++){
+				$ajout = false;
+				if(COUNT($tab_Intervenant) !=0 ){
+					for($e=0; $e<COUNT($tab_Intervenant); $e++){
+						if($tab_Intervenant[$e]["intervenant"] == $nbr_Inf15[$i]["intervenant"]){
+							$tab_Intervenant[$e]["nbr_Inf15"] = $nbr_Inf15[$i]["resultat_inf15"];
+							$ajout = false;
+							break;
+						}
+						else{
+							$ajout = true;
+						}
+					}
+				}
+				else{
+					$ajout = true;
+				}
+				
+
+				if($ajout == true){
+					$nbr = COUNT($tab_Intervenant);
+					$tab_Intervenant[$nbr]["intervenant"] = $nbr_Inf15[$i]["intervenant"];
+					$tab_Intervenant[$nbr]["nbr_Inf15"] = $nbr_Inf15[$i]["resultat_inf15"];
+				}
+			}
+
+			for($i=0; $i<COUNT($nbr_Entre15_30);$i++){
+				$ajout = false;
+
+				if(COUNT($tab_Intervenant) !=0 ){
+					for($e=0; $e<COUNT($tab_Intervenant); $e++){
+						if(COUNT($tab_Intervenant) == 0){
+							$ajout = true;
+						}
+						elseif($tab_Intervenant[$e]["intervenant"] == $nbr_Entre15_30[$i]["intervenant"]){
+							$tab_Intervenant[$e]["nbr_Entre15_30"] = $nbr_Entre15_30[$i]["resultat_15_30"];
+							$ajout = false;
+							break;
+						}
+						else{
+							$ajout = true;
+						}
+					}
+				}
+				else{
+					$ajout = true;
+				}
+
+				if($ajout == true){
+					$nbr = COUNT($tab_Intervenant);
+					$tab_Intervenant[$nbr]["intervenant"] = $nbr_Entre15_30[$i]["intervenant"];
+					$tab_Intervenant[$nbr]["nbr_Entre15_30"] = $nbr_Entre15_30[$i]["resultat_15_30"];
+				}
+			}
+		
+			$donne = array( "1"=>$str , "2"=>$nbr_mails , "3"=>$mailsSup30, "4"=>$dessous15, "5"=>$mails15_30, "tableau"=>$tab , "intervenant"=>$tab_Intervenant);
             return $donne; 
 		}
 

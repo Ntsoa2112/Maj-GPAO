@@ -372,13 +372,16 @@
 				 <input id="Entre15_30" type="hidden" value="<?=$pourc_mails15_30?>">
 				<?php
 				$tab = $donne["tableau"];
-				
+				$intervenant = $donne["intervenant"];
 				
 				echo $donne["1"];
+				print_r($intervenant);
 				echo'<br>';echo'<br>';
 				require("char.html");
 				echo'<br>';echo'<br>';echo'<br>';echo'<br>';
+				echo'Inty aho ity<br>';
 				require("baton.html");
+				echo'Inty aho ity eeeeeeee<br>';
 			}
 			else{
 				echo $c->RechercheMaha($dateSelect , $poleSelect , $clientSelect , $intervenantSelect , $ticketSelect);
