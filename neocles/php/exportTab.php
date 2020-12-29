@@ -1,5 +1,8 @@
+
 <script>
 function exportTab(){
+	//var htmlTableau = "<?php echo $str;?>";
+	//console.log(htmlTableau);
     myWindow = window.open("", "");
 	
 	myWindow.document.write('<html>');	
@@ -11,7 +14,7 @@ function exportTab(){
 	myWindow.document.write('<\/head>');		
 	myWindow.document.write('<body>');	
 	myWindow.document.write('<center>');
-	myWindow.document.write("<?php echo $str;?>");
+	//myWindow.document.write(htmlTableau);
 	myWindow.document.write('<br/><br/><input style="text-align:center;width:800px;"  type="button" id="btnExport1" value="Export CSV" onclick="exp()"/><center>');	
 	myWindow.document.write('<\/center>');	
 	myWindow.document.write('<\/body>');	

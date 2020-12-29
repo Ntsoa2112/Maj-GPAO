@@ -3898,7 +3898,36 @@ $nbSaisie=0;
 			}
 			
 			return $str; 
-		}		
+		}	
+		
+		function GetMoisAnneeMahaSup(){
+			//$sql = "SELECT distinct date_arrivee , CAST(date_arrivee AS date) AS indexage FROM helpdesk ORDER BY CAST(date_arrivee AS date) DESC";
+			//$sql = "SELECT distinct (date_arrivee) AS mois, year(date_arrivee) AS annees FROM helpdesk  ORDER BY CAST(date_arrivee AS date) DESC";
+			$sql = "SELECT DISTINCT(CAST(date_arrivee AS date)) AS date_arr FROM supervision  ORDER BY CAST(date_arrivee AS date) DESC";				
+				
+			$rs=$this->cnx->query($sql);
+			$str = "";
+			$myN = "";
+			if($rs != null){
+				while($arr = $rs->fetch())
+				{
+					$mdate = $arr['date_arr'];
+					$y = substr($mdate, 0, 4);
+					$m = substr($mdate, -5 ,2);
+					$my = $m."/".$y;
+					if($my != $myN){
+						$str .= '<option value='.$mdate.'>'.$my.'</option>';
+					}
+					$myN = $my;
+				}
+			}
+			else{
+
+				echo "erreur";
+			}
+			
+			return $str; 
+		}
 	  function GetClientMaha(){
 	  	$sql = "SELECT distinct(client) FROM helpdesk ORDER BY client DESC";
 			//$sql = "SELECT to_char(jour_debut_action,'dd/MM/yyyy') as test FROM action ORDER BY test;";
@@ -4256,36 +4285,6 @@ $nbSaisie=0;
 				$fin = "30/".$m."/".$y;
 			}
 			
-			function converSeconds($temps){
-				$str_time = $temps;
-			 
-				$str_time = preg_replace("/^([\d]{1,2})\:([\d]{2})$/", "00:$1:$2", $str_time);
-				
-				sscanf($str_time, "%d:%d:%d", $hours, $minutes, $seconds);
-				
-				$time_seconds = $hours * 3600 + $minutes * 60 + $seconds;
-				return $time_seconds;
-			 }
-			 function ConvertisseurTime($Time){
-				if($Time < 3600){ 
-				  $heures = 0; 
-				  
-				  if($Time < 60){$minutes = 0;} 
-				  else{$minutes = round($Time / 60);} 
-				  
-				  $secondes = floor($Time % 60); 
-				  } 
-				  else{ 
-				  $heures = round($Time / 3600); 
-				  $secondes = round($Time % 3600); 
-				  $minutes = floor($secondes / 60); 
-				  } 
-				  
-				  $secondes2 = round($secondes % 60); 
-				 
-				  $TimeFinal = "$heures:$minutes:$secondes2"; 
-				  return $TimeFinal; 
-			   }
 
 			$requete = "SELECT * FROM helpdesk WHERE ";
 			$critere_exist = false;
@@ -4330,7 +4329,36 @@ $nbSaisie=0;
 				$critere_exist = true;
 			}
 
-
+			function converSeconds($temps){
+				$str_time = $temps;
+			 
+				$str_time = preg_replace("/^([\d]{1,2})\:([\d]{2})$/", "00:$1:$2", $str_time);
+				
+				sscanf($str_time, "%d:%d:%d", $hours, $minutes, $seconds);
+				
+				$time_seconds = $hours * 3600 + $minutes * 60 + $seconds;
+				return $time_seconds;
+			 }
+			 function ConvertisseurTime($Time){
+				if($Time < 3600){ 
+				  $heures = 0; 
+				  
+				  if($Time < 60){$minutes = 0;} 
+				  else{$minutes = round($Time / 60);} 
+				  
+				  $secondes = floor($Time % 60); 
+				  } 
+				  else{ 
+				  $heures = round($Time / 3600); 
+				  $secondes = round($Time % 3600); 
+				  $minutes = floor($secondes / 60); 
+				  } 
+				  
+				  $secondes2 = round($secondes % 60); 
+				 
+				  $TimeFinal = "$heures:$minutes:$secondes2"; 
+				  return $TimeFinal; 
+			   }
 
 			$requete .= " ORDER BY id DESC";
 
@@ -4604,12 +4632,56 @@ $nbSaisie=0;
 					$tab_Intervenant[$nbr]["nbr_Entre15_30"] = $nbr_Entre15_30[$i]["resultat_15_30"];
 				}
 			}
+
+			//Tri tab
+			for($i=0; $i<count($tab); $i++){
+				$val1 = intval(substr( $tab[$i]["date_arrivee"],0,2));
+				for($e=0; $e<count($tab); $e++){
+					$val2 = intval(substr( $tab[$e]["date_arrivee"],0,2));
+					if($val1<$val2){
+						$ancien = $tab[$e];
+						$tab[$e] = $tab[$i];
+						$tab[$i] = $ancien;
+					}
+				}
+			}
 		
 			$donne = array( "1"=>$str , "2"=>$nbr_mails , "3"=>$mailsSup30, "4"=>$dessous15, "5"=>$mails15_30, "tableau"=>$tab , "intervenant"=>$tab_Intervenant);
             return $donne; 
 		}
+	
 
 	  function RechercheMahaSup($_date , $_etat , $_client , $_intervenant , $_ticket){
+		function converSeconds($temps){
+			$str_time = $temps;
+		 
+			$str_time = preg_replace("/^([\d]{1,2})\:([\d]{2})$/", "00:$1:$2", $str_time);
+			
+			sscanf($str_time, "%d:%d:%d", $hours, $minutes, $seconds);
+			
+			$time_seconds = $hours * 3600 + $minutes * 60 + $seconds;
+			return $time_seconds;
+		 }
+		 function ConvertisseurTime($Time){
+			if($Time < 3600){ 
+			  $heures = 0; 
+			  
+			  if($Time < 60){$minutes = 0;} 
+			  else{$minutes = round($Time / 60);} 
+			  
+			  $secondes = floor($Time % 60); 
+			  } 
+			  else{ 
+			  $heures = round($Time / 3600); 
+			  $secondes = round($Time % 3600); 
+			  $minutes = floor($secondes / 60); 
+			  } 
+			  
+			  $secondes2 = round($secondes % 60); 
+			 
+			  $TimeFinal = "$heures:$minutes:$secondes2"; 
+			  return $TimeFinal; 
+		   }
 
 			$requete = "SELECT * FROM supervision WHERE ";
 			$critere_exist = false;
@@ -4656,7 +4728,7 @@ $nbSaisie=0;
 			$requete .= " ORDER BY id DESC";
 
 
-			$str = "<table id='table_1' class='value'><tr><td>Date d'arriv&eacutee</td><td>Heure</td><td>Client</td><td>Origine</td><td>Heure de creation du ticket</td><td>Numero de ticket</td><td>Etat</td><td>Intervenant</td><td COLSPAN = 3>Commentaires</td><td>Modifier</td><td>Supprimer</td></tr>";
+			$str = "<table id='table_1' class='value'><tr><td>Date d'arriv&eacutee</td><td>Heure</td><td>Client</td><td>Origine</td><td>Heure de creation du ticket</td><td>Numero de ticket</td><td>Etat</td><td>Intervenant</td><td COLSPAN = 3>Commentaires</td><td>SLA</td><td>Modifier</td><td>Supprimer</td></tr>";
 
 			$res = $this->cnx->query($requete);
 
@@ -4680,6 +4752,21 @@ $nbSaisie=0;
 					$str .= "<td id = etat".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($arr['etat'], $sup30Min).">".$arr['etat']."</td>";
 					$str .= "<td id = intervenant".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($arr['intervenant'], $sup30Min).">".$arr['intervenant']."</td>";
 					$str .= "<td COLSPAN = 3 id = commentaire".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($arr['commentaire'], $sup30Min).">".$arr['commentaire']."</td>";
+					
+					$hArrive = $arr['heure_arrivee'].":00";
+					$hCreation = $arr['heure_creation_ticket'].":00";
+					$sArrive= converSeconds($hArrive);
+					$sCreation= converSeconds($hCreation);
+					$second_diff = intval($sCreation) - intval($sArrive);
+					$seconden30min = 31*60;
+					$temps_diff = ConvertisseurTime($second_diff);
+					if($second_diff>=$seconden30min){
+						$str .= "<td style='background-color:red; color:white;' id = sla".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($temps_diff, $sup30Min).">".$temps_diff."</td>";
+					}
+					else
+					{
+						$str .= "<td id = sla".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($temps_diff, $sup30Min).">".$temps_diff."</td>";
+					}
 					$str .= "<td><button id = '".$arr['id']."' class = 'button'>Modifier</button></td>";
 
 					$str .= "<td><button id = '".$arr['id']."s' class = 'button'>Supprimer</button></td>";
@@ -4694,6 +4781,385 @@ $nbSaisie=0;
 			$str .= $this->statistiqueSupervision($_date);
 
             return $str; 
+		}
+
+		function RechercheMahaSupMois($_date , $_etat , $_client , $_intervenant , $_ticket){
+			$d = substr($_date,-2,2);
+			$y = substr($_date,0, 4);
+			$m = substr($_date,-5,2);
+			$datem = $d."/".$m."/".$y;
+			$_date = $datem;
+			$debut = "01/".$m."/".$y;
+			$fin = "31/".$m."/".$y;
+			if($m == "02"){
+				$fin = "29/".$m."/".$y;
+			}
+			elseif($m == "04" || $m == "06" || $m == "09" || $m == "11"){
+				$fin = "30/".$m."/".$y;
+			}
+			
+			function converSeconds($temps){
+				$str_time = $temps;
+			 
+				$str_time = preg_replace("/^([\d]{1,2})\:([\d]{2})$/", "00:$1:$2", $str_time);
+				
+				sscanf($str_time, "%d:%d:%d", $hours, $minutes, $seconds);
+				
+				$time_seconds = $hours * 3600 + $minutes * 60 + $seconds;
+				return $time_seconds;
+			 }
+			 function ConvertisseurTime($Time){
+				if($Time < 3600){ 
+				  $heures = 0; 
+				  
+				  if($Time < 60){$minutes = 0;} 
+				  else{$minutes = round($Time / 60);} 
+				  
+				  $secondes = floor($Time % 60); 
+				  } 
+				  else{ 
+				  $heures = round($Time / 3600); 
+				  $secondes = round($Time % 3600); 
+				  $minutes = floor($secondes / 60); 
+				  } 
+				  
+				  $secondes2 = round($secondes % 60); 
+				 
+				  $TimeFinal = "$heures:$minutes:$secondes2"; 
+				  return $TimeFinal; 
+			   }
+
+			$requete = "SELECT * FROM supervision WHERE ";
+			$critere_exist = false;
+
+			if($_date != ""){
+				$requete = $requete." CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."'";
+				$critere_exist = true;
+			}
+
+			if($_etat != ""){
+				if($critere_exist){
+					$requete .= " AND ";
+				}
+				$requete = $requete." etat = '".$_etat."'";
+				$critere_exist = true;
+
+			}
+
+			if($_client != ""){
+				if($critere_exist){
+					$requete .= " AND ";
+				}
+				$requete = $requete." client = '".$_client."'";
+				$critere_exist = true;
+			}
+
+			if($_intervenant != ""){
+				if($critere_exist){
+					$requete .= " AND ";
+				}
+				$requete = $requete." intervenant = '".$_intervenant."'";
+				$critere_exist = true;
+			}
+
+			if($_ticket != ""){
+				if($critere_exist){
+					$requete .= " AND ";
+				}
+				$requete = $requete." numero_ticket = '".$_ticket."'";
+				$critere_exist = true;
+			}
+
+
+			$requete .= " ORDER BY id DESC";
+
+
+			$str = "<table id='table_1' class='value'><tr><td>Date d'arriv&eacutee</td><td>Heure</td><td>Client</td><td>Origine</td><td>Heure de creation du ticket</td><td>Numero de ticket</td><td>Etat</td><td>Intervenant</td><td COLSPAN = 3>Commentaires</td><td>SLA</td><td>Modifier</td><td>Supprimer</td></tr>";
+
+			$res = $this->cnx->query($requete);
+
+			if($res == null || $res == false){
+				$str = "<p>Aucun resultat</p>";
+			}
+			else{
+
+				while($arr = $res->fetch()){
+					
+					$sup30Min = $this->dateSuperieur30Min($arr['heure_arrivee'] , $arr['heure_creation_ticket']);
+
+					$str .= "<tr>";
+
+					$str .= "<td id = date_arrivee".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($arr['date_arrivee'] , $sup30Min).">".$arr['date_arrivee']."</td>";
+					$str .= "<td id = heure_arrivee".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($arr['heure_arrivee'], $sup30Min).">".$arr['heure_arrivee']."</td>";
+					$str .= "<td id = client".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($arr['client'], $sup30Min).">".$arr['client']."</td>";
+					$str .= "<td id = origine".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($arr['origine'], $sup30Min).">".$arr['origine']."</td>";
+					$str .= "<td id = heure_creation_ticket".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($arr['heure_creation_ticket'], $sup30Min).">".$arr['heure_creation_ticket']."</td>";
+					$str .= "<td id = numero_ticket".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($arr['numero_ticket'], $sup30Min).">".$arr['numero_ticket']."</td>";
+					$str .= "<td id = etat".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($arr['etat'], $sup30Min).">".$arr['etat']."</td>";
+					$str .= "<td id = intervenant".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($arr['intervenant'], $sup30Min).">".$arr['intervenant']."</td>";
+					$str .= "<td COLSPAN = 3 id = commentaire".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($arr['commentaire'], $sup30Min).">".$arr['commentaire']."</td>";
+
+					$hArrive = $arr['heure_arrivee'].":00";
+					$hCreation = $arr['heure_creation_ticket'].":00";
+					$sArrive= converSeconds($hArrive);
+					$sCreation= converSeconds($hCreation);
+					$second_diff = intval($sCreation) - intval($sArrive);
+					$seconden30min = 31*60;
+					$temps_diff = ConvertisseurTime($second_diff);
+					if($second_diff>=$seconden30min){
+						$str .= "<td style='background-color:red; color:white;' id = sla".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($temps_diff, $sup30Min).">".$temps_diff."</td>";
+					}
+					else
+					{
+						$str .= "<td id = sla".$arr['id'].$this->ColorerChampVide_HeureInf30Minute($temps_diff, $sup30Min).">".$temps_diff."</td>";
+					}
+
+					$str .= "<td><button id = '".$arr['id']."' class = 'button'>Modifier</button></td>";
+
+					$str .= "<td><button id = '".$arr['id']."s' class = 'button'>Supprimer</button></td>";
+
+					$str .= "</tr>";
+				}
+			}
+			$str .= "</table>";
+
+			include_once('exportTab.php');
+			
+			$str .= $this->statistiqueSupervisionMois($_date);
+
+$sql = $requete = "SELECT COUNT(*) AS resultat FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."'";
+			$resultat = $this->cnx->query($sql);
+			$dd = $resultat->fetch();
+			$nbr_mails = $dd['resultat'];
+
+			$sql = "SELECT COUNT(*) AS resultat FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) > ('00:30:00')";
+			$resultat = $this->cnx->query($sql);
+			$dd = $resultat->fetch();
+			$mailsSup30 = $dd['resultat'];
+			
+			$sql = "SELECT COUNT(*) AS resultat FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) < ('00:15:00')";
+			$resultat = $this->cnx->query($sql);
+			$dd = $resultat->fetch();
+			$dessous15 = $dd['resultat'];
+
+			$sql = "SELECT COUNT(*) AS resultat FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) BETWEEN ('00:15:00') AND ('00:30:00')";
+			$resultat = $this->cnx->query($sql);
+			$dd = $resultat->fetch();
+			$mails15_30 = $dd['resultat'];
+
+			
+			// REQUETTE STATISTIQUE JOUR:MOIS 
+
+
+			$sql = $requete = "SELECT date_arrivee, COUNT(*) as resulat_sup30 FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) > ('00:30:00') GROUP BY date_arrivee;";
+			$resultat = $this->cnx->query($sql);
+			$tab = $resultat->fetchAll();
+
+			$sql = $requete = "SELECT date_arrivee, COUNT(*) AS resultat_inf15 FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) < ('00:15:00') GROUP BY date_arrivee;";
+			$resultat = $this->cnx->query($sql);
+			$nbr_Inf15 = $resultat->fetchAll();
+
+			$sql = $requete = "SELECT date_arrivee, COUNT(*) AS resultat_15_30 FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) BETWEEN ('00:15:00') AND ('00:30:00') GROUP BY date_arrivee;";
+			$resultat = $this->cnx->query($sql);
+			$nbr_Entre15_30 = $resultat->fetchAll();
+
+
+			//On rassemble les 3 tableaux dans une même tableau
+			for($i=0; $i<COUNT($nbr_Inf15);$i++){
+				$ajout = false;
+				if(COUNT($tab) !=0 ){
+					for($e=0; $e<COUNT($tab); $e++){
+						if($tab[$e]["date_arrivee"] == $nbr_Inf15[$i]["date_arrivee"]){
+							$tab[$e]["nbr_Inf15"] = $nbr_Inf15[$i]["resultat_inf15"];
+							$ajout = false;
+							break;
+						}
+						else{
+							$ajout = true;
+						}
+					}
+				}
+				else{
+					$ajout = true;
+				}
+				
+
+				if($ajout == true){
+					$nbr = COUNT($tab);
+					$tab[$nbr]["date_arrivee"] = $nbr_Inf15[$i]["date_arrivee"];
+					$tab[$nbr]["nbr_Inf15"] = $nbr_Inf15[$i]["resultat_inf15"];
+				}
+			}
+
+			for($i=0; $i<COUNT($nbr_Entre15_30);$i++){
+				$ajout = false;
+
+				if(COUNT($tab) !=0 ){
+					for($e=0; $e<COUNT($tab); $e++){
+						if(COUNT($tab) == 0){
+							$ajout = true;
+						}
+						elseif($tab[$e]["date_arrivee"] == $nbr_Entre15_30[$i]["date_arrivee"]){
+							$tab[$e]["nbr_Entre15_30"] = $nbr_Entre15_30[$i]["resultat_15_30"];
+							$ajout = false;
+							break;
+						}
+						else{
+							$ajout = true;
+						}
+					}
+				}
+				else{
+					$ajout = true;
+				}
+
+				if($ajout == true){
+					$nbr = COUNT($tab);
+					$tab[$nbr]["date_arrivee"] = $nbr_Entre15_30[$i]["date_arrivee"];
+					$tab[$nbr]["nbr_Entre15_30"] = $nbr_Entre15_30[$i]["resultat_15_30"];
+				}
+			}
+						//On rassemble les 3 tableaux dans une même tableau
+			for($i=0; $i<COUNT($nbr_Inf15);$i++){
+				$ajout = false;
+				if(COUNT($tab) !=0 ){
+					for($e=0; $e<COUNT($tab); $e++){
+						if($tab[$e]["date_arrivee"] == $nbr_Inf15[$i]["date_arrivee"]){
+							$tab[$e]["nbr_Inf15"] = $nbr_Inf15[$i]["resultat_inf15"];
+							$ajout = false;
+							break;
+						}
+						else{
+							$ajout = true;
+						}
+					}
+				}
+				else{
+					$ajout = true;
+				}
+				
+
+				if($ajout == true){
+					$nbr = COUNT($tab);
+					$tab[$nbr]["date_arrivee"] = $nbr_Inf15[$i]["date_arrivee"];
+					$tab[$nbr]["nbr_Inf15"] = $nbr_Inf15[$i]["resultat_inf15"];
+				}
+			}
+
+			for($i=0; $i<COUNT($nbr_Entre15_30);$i++){
+				$ajout = false;
+
+				if(COUNT($tab) !=0 ){
+					for($e=0; $e<COUNT($tab); $e++){
+						if(COUNT($tab) == 0){
+							$ajout = true;
+						}
+						elseif($tab[$e]["date_arrivee"] == $nbr_Entre15_30[$i]["date_arrivee"]){
+							$tab[$e]["nbr_Entre15_30"] = $nbr_Entre15_30[$i]["resultat_15_30"];
+							$ajout = false;
+							break;
+						}
+						else{
+							$ajout = true;
+						}
+					}
+				}
+				else{
+					$ajout = true;
+				}
+
+				if($ajout == true){
+					$nbr = COUNT($tab);
+					$tab[$nbr]["date_arrivee"] = $nbr_Entre15_30[$i]["date_arrivee"];
+					$tab[$nbr]["nbr_Entre15_30"] = $nbr_Entre15_30[$i]["resultat_15_30"];
+				}
+			}
+
+			// REQUETTE NOMBRE MAILS PAR INTERVENANT
+
+			$sql = $requete = "SELECT intervenant, COUNT(*) as resulat_sup30 FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) > ('00:30:00') GROUP BY intervenant;";
+			$resultat = $this->cnx->query($sql);
+			$tab_Intervenant = $resultat->fetchAll();
+
+			$sql = $requete = "SELECT intervenant, COUNT(*) AS resultat_inf15 FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) < ('00:15:00') GROUP BY intervenant;";
+			$resultat = $this->cnx->query($sql);
+			$nbr_Inf15 = $resultat->fetchAll();
+
+			$sql = $requete = "SELECT intervenant, COUNT(*) AS resultat_15_30 FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) BETWEEN ('00:15:00') AND ('00:30:00') GROUP BY intervenant;";
+			$resultat = $this->cnx->query($sql);
+			$nbr_Entre15_30 = $resultat->fetchAll();
+
+			//On rassemble les 3 tableaux dans une même tableau
+			for($i=0; $i<COUNT($nbr_Inf15);$i++){
+				$ajout = false;
+				if(COUNT($tab_Intervenant) !=0 ){
+					for($e=0; $e<COUNT($tab_Intervenant); $e++){
+						if($tab_Intervenant[$e]["intervenant"] == $nbr_Inf15[$i]["intervenant"]){
+							$tab_Intervenant[$e]["nbr_Inf15"] = $nbr_Inf15[$i]["resultat_inf15"];
+							$ajout = false;
+							break;
+						}
+						else{
+							$ajout = true;
+						}
+					}
+				}
+				else{
+					$ajout = true;
+				}
+				
+
+				if($ajout == true){
+					$nbr = COUNT($tab_Intervenant);
+					$tab_Intervenant[$nbr]["intervenant"] = $nbr_Inf15[$i]["intervenant"];
+					$tab_Intervenant[$nbr]["nbr_Inf15"] = $nbr_Inf15[$i]["resultat_inf15"];
+				}
+			}
+
+			for($i=0; $i<COUNT($nbr_Entre15_30);$i++){
+				$ajout = false;
+
+				if(COUNT($tab_Intervenant) !=0 ){
+					for($e=0; $e<COUNT($tab_Intervenant); $e++){
+						if(COUNT($tab_Intervenant) == 0){
+							$ajout = true;
+						}
+						elseif($tab_Intervenant[$e]["intervenant"] == $nbr_Entre15_30[$i]["intervenant"]){
+							$tab_Intervenant[$e]["nbr_Entre15_30"] = $nbr_Entre15_30[$i]["resultat_15_30"];
+							$ajout = false;
+							break;
+						}
+						else{
+							$ajout = true;
+						}
+					}
+				}
+				else{
+					$ajout = true;
+				}
+
+				if($ajout == true){
+					$nbr = COUNT($tab_Intervenant);
+					$tab_Intervenant[$nbr]["intervenant"] = $nbr_Entre15_30[$i]["intervenant"];
+					$tab_Intervenant[$nbr]["nbr_Entre15_30"] = $nbr_Entre15_30[$i]["resultat_15_30"];
+				}
+			}
+
+			//Tri tab
+			for($i=0; $i<count($tab); $i++){
+				$val1 = intval(substr( $tab[$i]["date_arrivee"],0,2));
+				for($e=0; $e<count($tab); $e++){
+					$val2 = intval(substr( $tab[$e]["date_arrivee"],0,2));
+					if($val1<$val2){
+						$ancien = $tab[$e];
+						$tab[$e] = $tab[$i];
+						$tab[$i] = $ancien;
+					}
+				}
+			}
+		
+			$donne = array( "1"=>$str , "2"=>$nbr_mails , "3"=>$mailsSup30, "4"=>$dessous15, "5"=>$mails15_30, "tableau"=>$tab , "intervenant"=>$tab_Intervenant);
+            return $donne; 
 		}
 
 		function ColorerChampVide_HeureInf30Minute($champ , $superieur30Min){
@@ -5392,6 +5858,44 @@ $nbSaisie=0;
 			$requete = "SELECT COUNT(*) AS resultat FROM supervision WHERE date_arrivee = '$date'";				
 			$str .= $this->getResFromReq($requete);
 			$requete = "SELECT COUNT(*) AS resultat FROM supervision WHERE date_arrivee = '$date' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) > ('00:30:00')";				
+			$str .= $this->getResFromReq($requete);
+
+			$str .= "</tr>";
+			$str.="</table>";
+
+			return $str;
+		}
+		function statistiqueSupervisionMois($date){
+			$my = substr($date, 3);
+			$debut = "01/".$my;
+			$fin = "31/".$my;
+			$m = substr($my,0,2);
+			if($m == "2"){
+				$fin = "29/".$my;
+			}
+			elseif($m == "04" || $m == "06" || $m == "09" || $m == "11"){
+				$fin = "30/".$my;
+			}
+
+			$str = "<br/><div><h2>STATISTIQUE DU MOIS ". $my." </h2></div>";
+	
+			$str .= "<table id='table_2' class='value'><tr><td>Dur&eacutee Total de prise en compte</td><td>Dur&eacutee Moyenne de prise en compte</td><td>Dur&eacutee maximum de prise en compte</td><td>Quantit&eacute de mails</td><td>Quantit&eacute de mails depassant 30mn</td><td>Quantit&eacute de mails en dessous 15mn</td><td>Quantit&eacute de mails entre 15mn et 30mn</td></tr>";
+			
+			$str .= "<tr>";
+
+			$requete = "SELECT SUM(CAST(heure_creation_ticket AS TIME)) - SUM(CAST(heure_arrivee AS TIME)) AS resultat FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."'";				
+			$str .= $this->getResFromReq($requete);
+			$requete = "SELECT AVG(CAST(heure_creation_ticket AS TIME)) - AVG(CAST(heure_arrivee AS TIME)) AS resultat FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."'";				
+			$str .= $this->getResFromReq($requete);
+			$requete = "SELECT MAX((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) AS resultat FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."'";				
+			$str .= $this->getResFromReq($requete);
+			$requete = "SELECT COUNT(*) AS resultat FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."'";				
+			$str .= $this->getResFromReq($requete);
+			$requete = "SELECT COUNT(*) AS resultat FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) > ('00:30:00')";				
+			$str .= $this->getResFromReq($requete);
+			$requete = "SELECT COUNT(*) AS resultat FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) < ('00:15:00')";				
+			$str .= $this->getResFromReq($requete);
+			$requete = "SELECT COUNT(*) AS resultat FROM supervision WHERE CAST(date_arrivee as date) BETWEEN '".$debut."' AND '".$fin."' AND ((CAST(heure_creation_ticket AS TIME)) - (CAST(heure_arrivee AS TIME))) BETWEEN ('00:15:00') AND ('00:30:00')";				
 			$str .= $this->getResFromReq($requete);
 
 			$str .= "</tr>";

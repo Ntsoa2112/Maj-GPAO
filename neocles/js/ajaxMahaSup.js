@@ -36,27 +36,54 @@ $(document).ready(function(){
 		var etat = $("input[name='etat']").val();
 		var intervenant = $("input[name='intervenant']").val();
 		var commentaire = $("input[name='commentaire']").val();
+		var cli = client.length;
+		var t1 = heure_arrivee.split(':');
+		var t2 = heure_creation_ticket.split(':');
+		var ht1 = parseInt(t1[0],10);
+		var mt1 = parseInt(t1[1],10);
+		var ht2 = parseInt(t2[0],10);
+		var mt2 = parseInt(t2[1],10);
 
+		var temps1= (ht1 * 3600) + ( mt1 * 60) ;
+		var temps2= (ht2 * 3600) + ( mt2 * 60) ;
+		var tsla = temps2 - temps1; 
+		
+
+		function secondsToTime(secs)
+			{
+				var hours = Math.floor(secs / (60 * 60));
+
+				var divisor_for_minutes = secs % (60 * 60);
+				var minutes = Math.floor(divisor_for_minutes / 60);
+
+				var divisor_for_seconds = divisor_for_minutes % 60;
+				var seconds = Math.ceil(divisor_for_seconds);
+				var te = hours + ":" + minutes + ":" + seconds;
+				return te;
+			}
+
+//utilisation du regular expression string_reg.test(nom)
 		
 		if(date_arrivee!='' && verifFormatDate(date_arrivee)){
 			
 			if (heure_arrivee!='' && verifFormatHeure(heure_arrivee)) {
 				
-				if(client!=''){
+				if(client!='' && cli<=3){
 
-					if(demandeur!=''){
+					if(origine!=''){
 
 						if(numero_ticket!=''){	
 
 							if(heure_creation_ticket != '' || verifFormatHeure(heure_creation_ticket)){
 
-								if( pole_actuel!=''){
+								if( etat!=''){
 
 									if(intervenant!=''){
 
 										if(commentaire!=''){
-											
-											//envoi des données via AJAX
+
+											if(temps2 > temps1){
+
 											$.post(
 												link,
 												{
@@ -91,7 +118,15 @@ $(document).ready(function(){
 												},
 												'text'
 											);	
+
+											}
+											else{
+												 
+													alert("L'heure de création de ticket doit être supérieur à l'heure d'arrivé de mail ");
+											}
+	
 										}
+										
 										else{
 											vide($("input[name='commentaire']"));
 										}
@@ -120,7 +155,7 @@ $(document).ready(function(){
 					}
 				}
 				else{
-
+					alert("le nombre de caractères du client ne doit pas être supérieur à 3")
 					vide($("input[name='client']"));
 				}
 			}
@@ -197,7 +232,7 @@ $(document).ready(function(){
 		var clientSelect = ($("#clientSelect").val() == undefined)?'':$("#clientSelect").val();
 		var intervenantSelect = ($("#intervenantSelect").val() == undefined)?'':$("#intervenantSelect").val();		
 		var ticketSelect = ($("#ticketSelect").val() == undefined)?'':$("#ticketSelect").val();		
-		var moisSelect = ($("#moisSelectSup").val() == undefined)?'':$("#moisSelectSup").val();	
+		var moisSelectSup = ($("#moisSelectSup").val() == undefined)?'':$("#moisSelectSup").val();	
 		
 		
 		$("#ldtCorp").html('<div class="body" id="Etape"><img src = "img/loader.gif" width="50px"/>Loading ...</div>');

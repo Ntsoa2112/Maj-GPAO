@@ -17,7 +17,9 @@
 	if(in_array($_SESSION['id'], $autorises)){
 
 ?>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.5.0/Chart.min.js"></script>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>	
+	
 <div id="mcorps">
 	<div id="head">
 	
@@ -40,7 +42,7 @@
 			$ticket = $c->GetTicketMahaSup();
 			$etat = $c->GetEtatMahaSup();
 			$moisAnnee = $c->GetMoisAnneeMaha();
-
+			$moisAnneSup = $c->GetMoisAnneeMahaSup();
 		?>
 		
 		<!DOCTYPE html>
@@ -76,7 +78,7 @@
 								<span>Mois/Années</span><br /><br />
 								<select  id="moisSelectSup"><option value=""></option>
 									<?php
-										echo $moisAnnee;
+										echo $moisAnneSup;
 									?>
 								</select>
 								</td>
@@ -154,7 +156,7 @@
 										<input  type="time" name="heure_creation_ticket"  id="heure_creation_ticket" placeholder="Heure de la création" class = "heure" required="required"/>
 										</td>
 
-										<td ROWSPAN=2 COLSPAN = 2 id = "cadreBouton">
+										<td ROWSPAN=2 COLSPAN= 2 id = "cadreBouton">
 											<p class="imageok"><input  id="valider" type="submit" NAME="nom" VALUE="Enregistrer" required="required"></p>
 										</td>
 										<!-- <td ROWSPAN=2 id = "cadreBouton">
@@ -301,7 +303,7 @@
 							</tr>
 
 								<!--ONGLETT RECHERCHE TERMINE-->
-							<tr><td COLSPAN = 6 id ="insertionOuModification"><h1 id="titreMaha">INSERTION</h1></td></tr>
+							<tr><td COLSPAN = 7 id ="insertionOuModification"><h1 id="titreMaha">INSERTION</h1></td></tr>
 
 							<form action="fichier/traitement.php" method="post" id="formulaire">
 								
@@ -331,7 +333,7 @@
 										<input  type="time" name="heure_creation_ticket"  id="heure_creation_ticket" placeholder="Heure de la création" class = "heure" required="required"/>
 										</td>
 
-										<td ROWSPAN=2 id = "cadreBouton">
+										<td ROWSPAN=2 COLSPAN=2 id = "cadreBouton">
 											<p class="imageok"><input id="valider" type="submit" NAME="nom" VALUE="Enregistrer"></p>
 										</td>
 

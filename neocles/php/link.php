@@ -361,10 +361,9 @@
 				$dessous15  = intval($donne["4"]);
 				$mails15_30  = intval($donne["5"]);
 			
-				$pourc_mailsSup30 = round( ( (100 * $mailsSup30) / $nbr_mails) , 0);
-				$pourc_dessous15 = round( ( (100 * $dessous15) / $nbr_mails), 0);
-				$pourc_mails15_30 = round( ( (100 * $mails15_30) / $nbr_mails), 0);
-				echo $pourc_mailsSup30." *** ".$pourc_dessous15." *** ".$pourc_mails15_30;
+				$pourc_mailsSup30 = round( ( (100 * $mailsSup30) / $nbr_mails) , 2);
+				$pourc_dessous15 = round( ( (100 * $dessous15) / $nbr_mails), 2);
+				$pourc_mails15_30 = round( ( (100 * $mails15_30) / $nbr_mails), 2);
 				
 				 ?>
 				 <input id="Sup30" type="hidden" value="<?=$pourc_mailsSup30?>">
@@ -373,15 +372,17 @@
 				<?php
 				$tab = $donne["tableau"];
 				$intervenant = $donne["intervenant"];
-				
 				echo $donne["1"];
-				print_r($intervenant);
+				//print_r($tab);
 				echo'<br>';echo'<br>';
-				require("char.html");
-				echo'<br>';echo'<br>';echo'<br>';echo'<br>';
-				echo'Inty aho ity<br>';
-				require("baton.html");
-				echo'Inty aho ity eeeeeeee<br>';
+				require("char.php");
+				echo'<br>';echo'<br>';echo'<br>';echo'<br>';echo'<br>';echo'<br>';	
+				require("bar_vertical_1.php");
+				echo'<br>';echo'<br>';
+				require("exemplhoriz.php");
+				//echo'<br>';echo'<br>';echo'<br>';echo'<br>';
+				//require("bar_horizontal_1.html");echo'<br>';echo'<br>';echo'<br>';echo'<br>';
+				
 			}
 			else{
 				echo $c->RechercheMaha($dateSelect , $poleSelect , $clientSelect , $intervenantSelect , $ticketSelect);
@@ -421,9 +422,11 @@
 			$ticketSelect = $_REQUEST['ticketSelect'] ;	
 			
 			if(!empty($_REQUEST['moisSelectSup'])){
-				$moisSelect = $_REQUEST['moisSelectSup'];
-				$donne = $c->RechercheMois($moisSelectSup , $etatSelect , $clientSelect , $intervenantSelect , $ticketSelect);
-								
+				$moisSelectSup = $_REQUEST['moisSelectSup'];
+				$donne = $c->RechercheMahaSupMois($moisSelectSup , $etatSelect , $clientSelect , $intervenantSelect , $ticketSelect);
+				
+				//$donne = array( "1"=>$str , "2"=>$nbr_mails , "3"=>$mailsSup30, "4"=>$dessous15, "5"=>$mails15_30, "tableau"=>$tab , "intervenant"=>$tab_Intervenant);
+
 				$nbr_mails = intval($donne["2"]);
 				$mailsSup30 = intval($donne["3"]);
 				$dessous15  = intval($donne["4"]);
@@ -432,7 +435,6 @@
 				$pourc_mailsSup30 = round( ( (100 * $mailsSup30) / $nbr_mails) , 0);
 				$pourc_dessous15 = round( ( (100 * $dessous15) / $nbr_mails), 0);
 				$pourc_mails15_30 = round( ( (100 * $mails15_30) / $nbr_mails), 0);
-				echo $pourc_mailsSup30." *** ".$pourc_dessous15." *** ".$pourc_mails15_30;
 				
 				 ?>
 				 <input id="Sup30" type="hidden" value="<?=$pourc_mailsSup30?>">
@@ -440,13 +442,15 @@
 				 <input id="Entre15_30" type="hidden" value="<?=$pourc_mails15_30?>">
 				<?php
 				$tab = $donne["tableau"];
-				
-				
+				$intervenant = $donne["intervenant"];
+				$sup = true;
 				echo $donne["1"];
 				echo'<br>';echo'<br>';
-				require("char.html");
-				echo'<br>';echo'<br>';echo'<br>';echo'<br>';
-				require("baton.html");
+				require("char.php");
+				echo'<br>';echo'<br>';echo'<br>';echo'<br>';echo'<br>';echo'<br>';	
+				require("bar_vertical_1.php");
+
+				require("exemplhoriz.php");
 			}
 			else{
 				echo $c->RechercheMahaSup($dateSelect , $etatSelect  , $clientSelect , $intervenantSelect , $ticketSelect);
